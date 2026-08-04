@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app import document_files
+from app.documents import files
 
 TEST_UPLOAD_DIR = Path(__file__).parent / "_uploads"
 
@@ -24,7 +24,7 @@ def register_and_create_workspace(client: TestClient) -> str:
 
 
 def test_upload_list_and_delete_document(client: TestClient, monkeypatch) -> None:
-    monkeypatch.setattr(document_files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
+    monkeypatch.setattr(files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
     workspace_id = register_and_create_workspace(client)
     url = f"/api/v1/workspaces/{workspace_id}/documents"
 
@@ -59,7 +59,7 @@ def test_upload_list_and_delete_document(client: TestClient, monkeypatch) -> Non
 
 
 def test_rejects_unsupported_document(client: TestClient, monkeypatch) -> None:
-    monkeypatch.setattr(document_files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
+    monkeypatch.setattr(files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
     workspace_id = register_and_create_workspace(client)
     response = client.post(
         f"/api/v1/workspaces/{workspace_id}/documents",
@@ -78,5 +78,5 @@ def test_parses_docx_with_standard_library() -> None:
     with zipfile.ZipFile(content, "w") as archive:
         archive.writestr("word/document.xml", xml)
 
-    sections = document_files.parse_document(".docx", content.getvalue())
-    assert document_files.make_chunks(sections) == [(None, "CareerPilot project")]
+    sections = files.parse_document(".docx", content.getvalue())
+    assert files.make_chunks(sections) == [(None, "CareerPilot project")]

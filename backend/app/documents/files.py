@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 
 from pypdf import PdfReader
 
-UPLOAD_DIR = Path(__file__).resolve().parents[1] / "data" / "uploads"
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "data" / "uploads"
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_CHUNK_CHARS = 1000

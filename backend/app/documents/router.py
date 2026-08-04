@@ -8,12 +8,13 @@ from pypdf.errors import PyPdfError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import document_files
-from app.auth import current_user
-from app.database import get_db
-from app.models import Document, DocumentChunk, User
-from app.schemas import DocumentOut
-from app.workspaces import owned_workspace
+from app.auth.dependencies import current_user
+from app.auth.models import User
+from app.core.database import get_db
+from app.documents import files
+from app.documents.models import Document, DocumentChunk
+from app.documents.schemas import DocumentOut
+from app.workspaces.dependencies import owned_workspace
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/documents", tags=["documents"])
 CATEGORIES = {"resume", "project", "other"}
@@ -48,25 +49,21 @@ async def upload_document(
     await owned_workspace(workspace_id, user, db)
     original_name = Path(file.filename or "").name
     extension = Path(original_name).suffix.lower()
-    if (
-        not original_name
-        or len(original_name) > 255
-        or extension not in document_files.ALLOWED_EXTENSIONS
-    ):
+    if not original_name or len(original_name) > 255 or extension not in files.ALLOWED_EXTENSIONS:
         raise HTTPException(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "仅支持 PDF、DOCX、TXT 和 Markdown"
         )
     if category not in CATEGORIES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "无效的文档类型")
 
-    content = await file.read(document_files.MAX_FILE_BYTES + 1)
+    content = await file.read(files.MAX_FILE_BYTES + 1)
     await file.close()
     if not content:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "文件不能为空")
-    if len(content) > document_files.MAX_FILE_BYTES:
+    if len(content) > files.MAX_FILE_BYTES:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "文件不能超过 10 MB")
     try:
-        chunks = document_files.make_chunks(document_files.parse_document(extension, content))
+        chunks = files.make_chunks(files.parse_document(extension, content))
     except (
         OSError,
         UnicodeError,
@@ -80,7 +77,7 @@ async def upload_document(
     if not chunks:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "文档中没有可提取的文本")
 
-    stored_name = document_files.save_file(extension, content)
+    stored_name = files.save_file(extension, content)
     document = Document(
         workspace_id=workspace_id,
         original_name=original_name,
@@ -106,7 +103,7 @@ async def upload_document(
         await db.commit()
     except Exception:
         await db.rollback()
-        document_files.delete_file(stored_name)
+        files.delete_file(stored_name)
         raise
     await db.refresh(document)
     return document
@@ -128,4 +125,4 @@ async def delete_document(
     stored_name = document.stored_name
     await db.delete(document)
     await db.commit()
-    document_files.delete_file(stored_name)
+    files.delete_file(stored_name)

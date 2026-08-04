@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth import router as auth_router
-from app.config import FRONTEND_ORIGIN
-from app.documents import router as document_router
-from app.workspaces import router as workspace_router
+from app.auth.router import router as auth_router
+from app.core.config import FRONTEND_ORIGIN
+from app.documents.router import router as document_router
+from app.workspaces.router import router as workspace_router
 
 app = FastAPI(title="CareerPilot API", version="0.1.0")
 app.add_middleware(

@@ -1,25 +1,19 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import document_files
-from app.auth import current_user
-from app.database import get_db
-from app.models import Document, User, Workspace
-from app.schemas import WorkspaceCreate, WorkspaceOut, WorkspaceUpdate
+from app.auth.dependencies import current_user
+from app.auth.models import User
+from app.core.database import get_db
+from app.documents import files
+from app.documents.models import Document
+from app.workspaces.dependencies import owned_workspace
+from app.workspaces.models import Workspace
+from app.workspaces.schemas import WorkspaceCreate, WorkspaceOut, WorkspaceUpdate
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
-
-
-async def owned_workspace(workspace_id: uuid.UUID, user: User, db: AsyncSession) -> Workspace:
-    workspace = await db.scalar(
-        select(Workspace).where(Workspace.id == workspace_id, Workspace.user_id == user.id)
-    )
-    if not workspace:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
-    return workspace
 
 
 @router.get("", response_model=list[WorkspaceOut])
@@ -80,5 +74,5 @@ async def delete_workspace(
     await db.delete(workspace)
     await db.commit()
     for stored_name in stored_names:
-        document_files.delete_file(stored_name)
+        files.delete_file(stored_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

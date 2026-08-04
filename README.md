@@ -57,3 +57,12 @@
 API 文档：http://127.0.0.1:8000/docs
 
 健康检查：http://127.0.0.1:8000/api/v1/health
+
+## 项目结构
+
+- `backend/app/core`：配置、数据库连接和基础设施。
+- `backend/app/auth`：账户、Session 与鉴权依赖。
+- `backend/app/workspaces`：工作空间模型、校验和接口。
+- `backend/app/documents`：文档模型、解析、存储和接口。
+- `frontend/src/features`：按 auth、workspaces、documents 拆分的页面功能。
+- `frontend/src/api.ts`、`types.ts`：共享请求逻辑与类型。

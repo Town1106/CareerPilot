@@ -5,9 +5,11 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app import models  # noqa: F401
-from app.config import DATABASE_URL
-from app.database import Base
+from app.auth import models as auth_models  # noqa: F401
+from app.core.config import DATABASE_URL
+from app.core.database import Base
+from app.documents import models as document_models  # noqa: F401
+from app.workspaces import models as workspace_models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
@@ -48,4 +50,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_async_migrations())
-

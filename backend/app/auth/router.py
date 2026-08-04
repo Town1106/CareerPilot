@@ -1,4 +1,3 @@
-import hashlib
 import secrets
 from datetime import timedelta
 
@@ -9,17 +8,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import COOKIE_SECURE, SESSION_COOKIE, SESSION_DAYS
-from app.database import get_db
-from app.models import LoginSession, User, utc_now
-from app.schemas import AuthRequest, UserOut
+from app.auth.dependencies import current_user, hash_token
+from app.auth.models import LoginSession, User
+from app.auth.schemas import AuthRequest, UserOut
+from app.core.config import COOKIE_SECURE, SESSION_COOKIE, SESSION_DAYS
+from app.core.database import get_db, utc_now
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 password_hasher = PasswordHasher()
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
 
 
 async def create_login_session(response: Response, user: User, db: AsyncSession) -> None:
@@ -41,26 +37,6 @@ async def create_login_session(response: Response, user: User, db: AsyncSession)
         secure=COOKIE_SECURE,
         samesite="lax",
     )
-
-
-async def current_user(
-    token: str | None = Cookie(default=None, alias=SESSION_COOKIE),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    if not token:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required")
-
-    user = await db.scalar(
-        select(User)
-        .join(LoginSession, LoginSession.user_id == User.id)
-        .where(
-            LoginSession.token_hash == hash_token(token),
-            LoginSession.expires_at > utc_now(),
-        )
-    )
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
-    return user
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -92,9 +68,7 @@ async def login(
     try:
         password_hasher.verify(user.password_hash, payload.password)
     except (InvalidHashError, VerifyMismatchError):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Invalid email or password"
-        ) from None
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password") from None
 
     await create_login_session(response, user, db)
     return user
@@ -115,4 +89,3 @@ async def logout(
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(current_user)) -> User:
     return user
-
