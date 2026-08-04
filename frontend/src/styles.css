@@ -17,7 +17,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -160,7 +161,8 @@ label {
   font-weight: 650;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 14px 15px;
   border: 1px solid #ccd1ca;
@@ -172,6 +174,11 @@ input {
 }
 
 input:focus {
+  border-color: #35694f;
+  box-shadow: 0 0 0 3px rgb(53 105 79 / 12%);
+}
+
+select:focus {
   border-color: #35694f;
   box-shadow: 0 0 0 3px rgb(53 105 79 / 12%);
 }
@@ -345,6 +352,145 @@ input:focus {
   margin-top: auto;
 }
 
+.card-actions .primary {
+  margin-right: auto;
+  padding: 9px 12px;
+}
+
+.knowledge-shell {
+  padding: 34px clamp(24px, 6vw, 90px) 80px;
+}
+
+.back-button {
+  width: auto;
+  margin: 0 0 30px;
+  padding-left: 0;
+}
+
+.knowledge-header,
+.documents-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.knowledge-header h1 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 400;
+}
+
+.knowledge-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.5fr);
+  gap: 18px;
+  margin-top: 44px;
+}
+
+.upload-card,
+.documents-card {
+  padding: 30px;
+  border: 1px solid #d5d6cf;
+  border-radius: 14px;
+  background: #faf9f5;
+}
+
+.upload-card {
+  align-content: start;
+  margin: 0;
+}
+
+.upload-card h2,
+.documents-card h2 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 28px;
+  font-weight: 400;
+}
+
+.hint {
+  margin: -4px 0 0;
+  color: #7c847f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.documents-title {
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dedfd9;
+}
+
+.documents-title strong {
+  color: #afb4af;
+  font-family: Georgia, serif;
+  font-size: 42px;
+  font-weight: 400;
+}
+
+.documents-empty {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: #7c847f;
+  text-align: center;
+}
+
+.document-list {
+  display: grid;
+}
+
+.document-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid #e2e2dc;
+}
+
+.document-row:last-child {
+  border-bottom: 0;
+}
+
+.file-badge {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+  background: #e8ede7;
+  color: #315844;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.document-info h3,
+.document-info p {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-info h3 {
+  font-size: 14px;
+}
+
+.document-info p {
+  margin-top: 6px;
+  color: #778079;
+  font-size: 12px;
+}
+
+.ready {
+  padding: 5px 9px;
+  border-radius: 99px;
+  background: #e1eee4;
+  color: #36734d;
+  font-size: 11px;
+}
+
 .empty-card {
   display: flex;
   grid-column: span 2;
@@ -407,6 +553,10 @@ input:focus {
     grid-template-columns: 1fr 1fr;
   }
 
+  .knowledge-grid {
+    grid-template-columns: 1fr;
+  }
+
   .new-workspace {
     grid-column: span 2;
   }
@@ -425,6 +575,20 @@ input:focus {
 
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .knowledge-header {
+    align-items: start;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .document-row {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+  }
+
+  .document-row .ready {
+    display: none;
   }
 
   .new-workspace,

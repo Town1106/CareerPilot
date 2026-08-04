@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import document_files
 from app.auth import current_user
 from app.database import get_db
-from app.models import User, Workspace
+from app.models import Document, User, Workspace
 from app.schemas import WorkspaceCreate, WorkspaceOut, WorkspaceUpdate
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
@@ -28,9 +29,7 @@ async def list_workspaces(
     return list(
         (
             await db.scalars(
-                select(Workspace)
-                .where(Workspace.user_id == user.id)
-                .order_by(Workspace.created_at)
+                select(Workspace).where(Workspace.user_id == user.id).order_by(Workspace.created_at)
             )
         ).all()
     )
@@ -71,7 +70,15 @@ async def delete_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     workspace = await owned_workspace(workspace_id, user, db)
+    stored_names = list(
+        (
+            await db.scalars(
+                select(Document.stored_name).where(Document.workspace_id == workspace.id)
+            )
+        ).all()
+    )
     await db.delete(workspace)
     await db.commit()
+    for stored_name in stored_names:
+        document_files.delete_file(stored_name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-

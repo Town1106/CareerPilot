@@ -7,7 +7,8 @@
 - FastAPI 健康检查。
 - 邮箱注册、登录、退出和 HttpOnly Session。
 - 用户工作空间创建、列表、重命名和删除。
-- React 工作空间界面。
+- PDF、DOCX、TXT、Markdown 文档上传、解析、切块和删除。
+- React 工作空间与知识库管理界面。
 
 ## 快速启动
 
@@ -17,20 +18,18 @@
     conda activate careerpilot
     cd backend
     python -m uv sync
-    python -m uv run alembic upgrade head
-    python -m uv run uvicorn app.main:app --reload
+    python -m uv run --env-file ../.env alembic upgrade head
+    python -m uv run --env-file ../.env uvicorn app.main:app --reload
 
-未配置 DATABASE_URL 时使用本地 SQLite，适合快速开发。
+根目录 `.env` 保存本机数据库连接信息，不会提交到 Git。未加载 `.env` 时使用本地 SQLite。
 
 如需 PostgreSQL，安装 Docker 后在项目根目录执行：
 
     docker compose up -d postgres
 
-再在启动后端的 PowerShell 中设置：
+复制 `.env.example` 为 `.env`，再按实际环境修改连接信息：
 
-    $env:DATABASE_URL="postgresql+asyncpg://careerpilot:careerpilot@127.0.0.1:5433/careerpilot"
-    python -m uv run alembic upgrade head
-    python -m uv run uvicorn app.main:app --reload
+    Copy-Item .env.example .env
 
 ### 2. 前端
 

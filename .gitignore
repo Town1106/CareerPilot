@@ -7,4 +7,6 @@ __pycache__/
 *.db
 node_modules/
 dist/
+backend/data/uploads/
+backend/tests/_uploads/
 .idea/
