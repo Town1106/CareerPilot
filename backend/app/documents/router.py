@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import uuid
 import zipfile
 from pathlib import Path
@@ -10,14 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import current_user
 from app.auth.models import User
+from app.core.config import DASHSCOPE_API_KEY
 from app.core.database import get_db
 from app.documents import files
 from app.documents.models import Document, DocumentChunk
 from app.documents.schemas import DocumentOut
+from app.rag import store
+from app.rag.service import index_document
+from app.rag.store import VectorStoreError
 from app.workspaces.dependencies import owned_workspace
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/documents", tags=["documents"])
 CATEGORIES = {"resume", "project", "other"}
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[DocumentOut])
@@ -85,7 +92,7 @@ async def upload_document(
         media_type=file.content_type or "application/octet-stream",
         category=category,
         size_bytes=len(content),
-        status="ready",
+        status="parsed",
         chunk_count=len(chunks),
     )
     try:
@@ -106,6 +113,8 @@ async def upload_document(
         files.delete_file(stored_name)
         raise
     await db.refresh(document)
+    if DASHSCOPE_API_KEY:
+        return await index_document(db, document)
     return document
 
 
@@ -126,3 +135,7 @@ async def delete_document(
     await db.delete(document)
     await db.commit()
     files.delete_file(stored_name)
+    try:
+        await asyncio.to_thread(store.delete_document, document_id)
+    except VectorStoreError as error:
+        logger.warning("Vector cleanup failed for document %s: %s", document_id, error)

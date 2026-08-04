@@ -18,7 +18,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -162,7 +163,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   padding: 14px 15px;
   border: 1px solid #ccd1ca;
@@ -173,7 +175,8 @@ select {
   transition: border-color 160ms, box-shadow 160ms;
 }
 
-input:focus {
+input:focus,
+textarea:focus {
   border-color: #35694f;
   box-shadow: 0 0 0 3px rgb(53 105 79 / 12%);
 }
@@ -483,12 +486,112 @@ select:focus {
   font-size: 12px;
 }
 
-.ready {
+.document-status {
   padding: 5px 9px;
   border-radius: 99px;
   background: #e1eee4;
   color: #36734d;
   font-size: 11px;
+}
+
+.document-status.parsed {
+  background: #eee9dc;
+  color: #795d2f;
+}
+
+.document-status.indexing {
+  background: #e5ebf2;
+  color: #42617d;
+}
+
+.document-status.failed {
+  background: #f4e2df;
+  color: #9c3e36;
+}
+
+.document-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.document-actions button {
+  white-space: nowrap;
+}
+
+.index-error {
+  grid-column: 2 / -1;
+  margin: -8px 0 0;
+  color: #9c3e36;
+  font-size: 12px;
+}
+
+.rag-card {
+  margin-top: 18px;
+  padding: 30px;
+  border: 1px solid #d5d6cf;
+  border-radius: 14px;
+  background: #faf9f5;
+}
+
+.rag-card h2,
+.rag-card h3 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-weight: 400;
+}
+
+.rag-card h2 {
+  font-size: 28px;
+}
+
+.rag-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin-top: 22px;
+}
+
+.rag-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.rag-result {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid #dedfd9;
+}
+
+.answer-text {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+.citations {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.citations details {
+  padding: 13px 15px;
+  border: 1px solid #d9ddd7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.citations summary {
+  cursor: pointer;
+  color: #315844;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.citations p {
+  margin: 12px 0 0;
+  color: #4d5951;
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .empty-card {
@@ -587,8 +690,12 @@ select:focus {
     grid-template-columns: 42px minmax(0, 1fr) auto;
   }
 
-  .document-row .ready {
+  .document-row .document-status {
     display: none;
+  }
+
+  .rag-form {
+    grid-template-columns: 1fr;
   }
 
   .new-workspace,

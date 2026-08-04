@@ -19,7 +19,9 @@ class Document(Base):
     media_type: Mapped[str] = mapped_column(String(100))
     category: Mapped[str] = mapped_column(String(20))
     size_bytes: Mapped[int] = mapped_column(Integer)
-    status: Mapped[str] = mapped_column(String(20), default="ready")
+    status: Mapped[str] = mapped_column(String(20), default="parsed")
+    index_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 

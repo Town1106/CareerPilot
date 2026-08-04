@@ -1,12 +1,22 @@
 import io
+import uuid
 import zipfile
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from qdrant_client import QdrantClient
 
 from app.documents import files
+from app.documents import router as documents_router
+from app.rag import gateway, store
 
 TEST_UPLOAD_DIR = Path(__file__).parent / "_uploads"
+
+
+@pytest.fixture(autouse=True)
+def disable_real_auto_index(monkeypatch) -> None:
+    monkeypatch.setattr(documents_router, "DASHSCOPE_API_KEY", "")
 
 
 def register_and_create_workspace(client: TestClient) -> str:
@@ -36,7 +46,7 @@ def test_upload_list_and_delete_document(client: TestClient, monkeypatch) -> Non
     assert response.status_code == 201, response.text
     document = response.json()
     assert document["category"] == "resume"
-    assert document["status"] == "ready"
+    assert document["status"] == "parsed"
     assert document["chunk_count"] >= 2
     assert len(list(TEST_UPLOAD_DIR.iterdir())) == 1
 
@@ -80,3 +90,47 @@ def test_parses_docx_with_standard_library() -> None:
 
     sections = files.parse_document(".docx", content.getvalue())
     assert files.make_chunks(sections) == [(None, "CareerPilot project")]
+
+
+def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
+    qdrant = QdrantClient(":memory:", force_disable_check_same_thread=True)
+    monkeypatch.setattr(store, "get_client", lambda: qdrant)
+
+    async def fake_embeddings(texts: list[str]) -> list[list[float]]:
+        return [[1.0] + [0.0] * 1023 for _ in texts]
+
+    async def fake_answer(question: str, sources: list[str]) -> str:
+        assert question == "这个项目使用什么后端框架？"
+        assert "FastAPI" in sources[0]
+        return "项目使用 FastAPI 作为后端框架。[S1]"
+
+    monkeypatch.setattr(gateway, "embed_texts", fake_embeddings)
+    monkeypatch.setattr(gateway, "answer_with_context", fake_answer)
+    workspace_id = register_and_create_workspace(client)
+    invalid_question = client.post(
+        f"/api/v1/workspaces/{workspace_id}/rag/ask", json={"question": "   "}
+    )
+    assert invalid_question.status_code == 422
+    url = f"/api/v1/workspaces/{workspace_id}/documents"
+    uploaded = client.post(
+        url,
+        data={"category": "project"},
+        files={"file": ("project.md", "CareerPilot 使用 FastAPI 开发后端。", "text/markdown")},
+    ).json()
+
+    indexed = client.post(f"{url}/{uploaded['id']}/index")
+    assert indexed.status_code == 200, indexed.text
+    assert indexed.json()["status"] == "indexed"
+
+    answer = client.post(
+        f"/api/v1/workspaces/{workspace_id}/rag/ask",
+        json={"question": "这个项目使用什么后端框架？"},
+    )
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["answer"].endswith("[S1]")
+    assert answer.json()["citations"][0]["original_name"] == "project.md"
+
+    assert client.delete(f"/api/v1/workspaces/{workspace_id}").status_code == 204
+    assert store.search(uuid.UUID(workspace_id), [1.0] + [0.0] * 1023, 5) == []
+    qdrant.close()

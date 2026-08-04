@@ -14,5 +14,7 @@ class DocumentOut(BaseModel):
     category: str
     size_bytes: int
     status: str
+    index_error: str | None
+    indexed_at: datetime | None
     chunk_count: int
     created_at: datetime

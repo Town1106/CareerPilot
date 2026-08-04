@@ -1,9 +1,15 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api";
-import type { Document, Workspace } from "../../types";
+import type { Document, RagAnswer, Workspace } from "../../types";
 
 const CATEGORY_NAMES = { resume: "简历", project: "项目资料", other: "其他资料" };
+const STATUS_NAMES: Record<string, string> = {
+  parsed: "待索引",
+  indexing: "索引中",
+  indexed: "已索引",
+  failed: "索引失败",
+};
 
 export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -11,6 +17,10 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
   const [category, setCategory] = useState<Document["category"]>("resume");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [indexingId, setIndexingId] = useState<string | null>(null);
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [result, setResult] = useState<RagAnswer | null>(null);
   const [error, setError] = useState("");
   const url = `/api/v1/workspaces/${workspace.id}/documents`;
 
@@ -56,6 +66,37 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
       setDocuments((items) => items.filter((item) => item.id !== document.id));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "删除失败");
+    }
+  }
+
+  async function index(document: Document) {
+    setIndexingId(document.id);
+    setError("");
+    try {
+      const updated = await api<Document>(`${url}/${document.id}/index`, { method: "POST" });
+      setDocuments((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "建立索引失败");
+    } finally {
+      setIndexingId(null);
+    }
+  }
+
+  async function ask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = question.trim();
+    if (text.length < 2) return;
+    setAsking(true);
+    setError("");
+    try {
+      setResult(await api<RagAnswer>(`/api/v1/workspaces/${workspace.id}/rag/ask`, {
+        method: "POST",
+        body: JSON.stringify({ question: text }),
+      }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "知识库问答失败");
+    } finally {
+      setAsking(false);
     }
   }
 
@@ -123,14 +164,69 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
                       {" · "}{document.chunk_count} 个文本块
                     </p>
                   </div>
-                  <span className="ready">已解析</span>
-                  <button className="danger" onClick={() => remove(document)}>删除</button>
+                  <span className={`document-status ${document.status}`}>
+                    {STATUS_NAMES[document.status] || document.status}
+                  </span>
+                  <div className="document-actions">
+                    {document.status !== "indexed" && (
+                      <button
+                        className="ghost"
+                        disabled={indexingId === document.id}
+                        onClick={() => void index(document)}
+                      >
+                        {indexingId === document.id ? "索引中…" : document.status === "failed" ? "重试" : "建立索引"}
+                      </button>
+                    )}
+                    <button className="danger" onClick={() => void remove(document)}>删除</button>
+                  </div>
+                  {document.index_error && <p className="index-error">{document.index_error}</p>}
                 </article>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      <section className="rag-card">
+        <div>
+          <p className="eyebrow">EVIDENCE Q&amp;A</p>
+          <h2>向知识库提问</h2>
+          <p className="muted">回答仅基于当前工作空间中已索引的资料，并附上引用原文。</p>
+        </div>
+        <form className="rag-form" onSubmit={ask}>
+          <textarea
+            value={question}
+            minLength={2}
+            maxLength={1000}
+            required
+            placeholder="例如：我的项目中使用了哪些技术，它们分别解决了什么问题？"
+            onChange={(event) => setQuestion(event.target.value)}
+          />
+          <button className="primary" disabled={asking || !documents.some((item) => item.status === "indexed")}>
+            {asking ? "正在检索并生成…" : "基于资料回答"}
+          </button>
+        </form>
+        {result && (
+          <div className="rag-result">
+            <h3>回答</h3>
+            <p className="answer-text">{result.answer}</p>
+            {result.citations.length > 0 && (
+              <div className="citations">
+                <h3>引用证据</h3>
+                {result.citations.map((citation) => (
+                  <details key={citation.chunk_id}>
+                    <summary>
+                      [{citation.label}] {citation.original_name}
+                      {citation.page_number ? ` · 第 ${citation.page_number} 页` : ""}
+                    </summary>
+                    <p>{citation.content}</p>
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
       {error && <div className="toast" role="alert">{error}</div>}
     </section>
   );

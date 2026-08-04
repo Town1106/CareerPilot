@@ -16,6 +16,24 @@ export type Document = {
   category: "resume" | "project" | "other";
   size_bytes: number;
   status: string;
+  index_error: string | null;
+  indexed_at: string | null;
   chunk_count: number;
   created_at: string;
+};
+
+export type Citation = {
+  label: string;
+  chunk_id: string;
+  document_id: string;
+  original_name: string;
+  page_number: number | null;
+  position: number;
+  content: string;
+  score: number;
+};
+
+export type RagAnswer = {
+  answer: string;
+  citations: Citation[];
 };

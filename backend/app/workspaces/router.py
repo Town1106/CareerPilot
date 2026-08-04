@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
@@ -9,11 +11,14 @@ from app.auth.models import User
 from app.core.database import get_db
 from app.documents import files
 from app.documents.models import Document
+from app.rag import store
+from app.rag.store import VectorStoreError
 from app.workspaces.dependencies import owned_workspace
 from app.workspaces.models import Workspace
 from app.workspaces.schemas import WorkspaceCreate, WorkspaceOut, WorkspaceUpdate
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[WorkspaceOut])
@@ -75,4 +80,8 @@ async def delete_workspace(
     await db.commit()
     for stored_name in stored_names:
         files.delete_file(stored_name)
+    try:
+        await asyncio.to_thread(store.delete_workspace, workspace_id)
+    except VectorStoreError as error:
+        logger.warning("Vector cleanup failed for workspace %s: %s", workspace_id, error)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
