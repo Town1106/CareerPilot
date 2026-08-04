@@ -48,8 +48,8 @@ RAG 使用以下环境变量（参照 `.env.example`）：
 另开一个 PowerShell：
 
     cd D:\codex-project\match\frontend
-    pnpm install
-    pnpm dev
+    npm install
+    npm run dev
 
 打开 http://localhost:5173。
 
@@ -64,7 +64,7 @@ RAG 使用以下环境变量（参照 `.env.example`）：
 前端：
 
     cd D:\codex-project\match\frontend
-    pnpm build
+    npm run build
 
 API 文档：http://127.0.0.1:8000/docs
 
