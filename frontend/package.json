@@ -1,0 +1,20 @@
+{
+  "name": "careerpilot-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "react": ">=19 <20",
+    "react-dom": ">=19 <20"
+  },
+  "devDependencies": {
+    "@types/react": ">=19 <20",
+    "@types/react-dom": ">=19 <20",
+    "typescript": ">=5.8 <6",
+    "vite": ">=7 <8"
+  }
+}

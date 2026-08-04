@@ -1,0 +1,434 @@
+:root {
+  color: #17211b;
+  background: #f2f0e9;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.intro {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(48px, 8vw, 120px);
+  color: #f6f3e9;
+  background: #173e2d;
+}
+
+.intro::after {
+  position: absolute;
+  right: -120px;
+  bottom: -180px;
+  width: 520px;
+  height: 520px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 70px rgb(255 255 255 / 4%), 0 0 0 140px rgb(255 255 255 / 3%);
+  content: "";
+}
+
+.brand-mark {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 40px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-size: 18px;
+}
+
+.brand-mark.small {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  color: #8b5e3c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.intro .eyebrow {
+  color: #c8d8b4;
+}
+
+.intro h1 {
+  z-index: 1;
+  max-width: 680px;
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: clamp(44px, 6vw, 82px);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.intro-copy {
+  z-index: 1;
+  max-width: 560px;
+  margin: 32px 0;
+  color: #d3ded7;
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.feature-row {
+  z-index: 1;
+  display: flex;
+  gap: 12px;
+}
+
+.feature-row span {
+  padding: 8px 13px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 99px;
+  color: #e7ede8;
+  font-size: 12px;
+}
+
+.auth-panel {
+  display: grid;
+  padding: 40px;
+  place-items: center;
+  background: #f7f5ef;
+}
+
+.auth-card {
+  width: min(100%, 420px);
+}
+
+.auth-card h2,
+.new-workspace h2,
+.workspace-card h2,
+.empty-card h2 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 30px;
+  font-weight: 400;
+}
+
+.muted {
+  color: #6d756f;
+  line-height: 1.6;
+}
+
+form {
+  display: grid;
+  gap: 18px;
+  margin-top: 34px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: #38453d;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+input {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid #ccd1ca;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: #17211b;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+input:focus {
+  border-color: #35694f;
+  box-shadow: 0 0 0 3px rgb(53 105 79 / 12%);
+}
+
+.primary {
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #173e2d;
+  color: #fff;
+  font-weight: 700;
+}
+
+.primary:hover {
+  background: #23553e;
+}
+
+.primary:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.text-button,
+.ghost,
+.danger {
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: #315844;
+}
+
+.text-button {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.ghost {
+  border: 1px solid #cad0c9;
+  border-radius: 6px;
+}
+
+.danger {
+  color: #9c3e36;
+}
+
+.error {
+  margin: 0;
+  color: #a33e36;
+  font-size: 13px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: #f2f0e9;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px clamp(24px, 5vw, 72px);
+  border-bottom: 1px solid #d9d8d1;
+  background: rgb(247 245 239 / 88%);
+}
+
+.brand,
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand {
+  font-family: Georgia, serif;
+  font-size: 20px;
+}
+
+.account {
+  color: #68716b;
+  font-size: 13px;
+}
+
+.workspace-hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  padding: 72px clamp(24px, 6vw, 90px) 48px;
+}
+
+.workspace-hero h1 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.status-pill {
+  padding: 10px 14px;
+  border: 1px solid #ccd1ca;
+  border-radius: 99px;
+  color: #4c5e53;
+  background: #f8f7f2;
+  font-size: 12px;
+}
+
+.status-pill span {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #4b9869;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0 clamp(24px, 6vw, 90px) 80px;
+}
+
+.new-workspace,
+.workspace-card,
+.empty-card {
+  min-height: 330px;
+  padding: 30px;
+  border: 1px solid #d5d6cf;
+  border-radius: 14px;
+  background: #faf9f5;
+}
+
+.new-workspace {
+  gap: 14px;
+  margin: 0;
+  border-style: dashed;
+}
+
+.new-workspace h2 {
+  font-size: 25px;
+}
+
+.plus {
+  color: #396a51;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.workspace-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-card .index {
+  align-self: end;
+  margin-bottom: 52px;
+  color: #afb4af;
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
+.workspace-card .muted {
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.empty-card {
+  display: flex;
+  grid-column: span 2;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  max-width: 360px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: #9c3e36;
+  color: #fff;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 16%);
+}
+
+.loading-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: #173e2d;
+  color: #fff;
+}
+
+.loading-screen .brand-mark {
+  margin: 0;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+}
+
+@media (max-width: 900px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .intro {
+    min-height: 46vh;
+    padding: 48px 28px;
+  }
+
+  .intro .brand-mark {
+    margin-bottom: 24px;
+  }
+
+  .auth-panel {
+    padding: 54px 24px;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .new-workspace {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 620px) {
+  .account span {
+    display: none;
+  }
+
+  .workspace-hero {
+    align-items: start;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .new-workspace,
+  .empty-card {
+    grid-column: span 1;
+  }
+}
