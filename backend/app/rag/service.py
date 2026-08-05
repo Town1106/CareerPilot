@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import RAG_RETRIEVAL_MODE, RAG_TOP_K
 from app.core.database import utc_now
-from app.documents.models import Document, DocumentChunk
+from app.documents.models import Document, DocumentChunk, DocumentVersion
 from app.rag import gateway, store
 from app.rag.gateway import AIServiceError
 from app.rag.schemas import AnswerOut, CitationOut
@@ -16,10 +16,12 @@ from app.rag.store import VectorStoreError
 
 async def retrieve_chunks(
     db: AsyncSession, workspace_id: uuid.UUID, question: str, limit: int = RAG_TOP_K
-) -> list[tuple[DocumentChunk, Document, float]]:
+) -> list[tuple[DocumentChunk, Document, DocumentVersion, float]]:
     if not await db.scalar(
-        select(Document.id).where(
-            Document.workspace_id == workspace_id, Document.status == "indexed"
+        select(Document.id)
+        .join(DocumentVersion, DocumentVersion.id == Document.active_version_id)
+        .where(
+            Document.workspace_id == workspace_id, DocumentVersion.status == "indexed"
         )
     ):
         return []
@@ -33,16 +35,19 @@ async def retrieve_chunks(
     score_by_id = dict(hits)
     rows = (
         await db.execute(
-            select(DocumentChunk, Document)
-            .join(Document, Document.id == DocumentChunk.document_id)
+            select(DocumentChunk, Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.id == DocumentChunk.version_id)
+            .join(Document, Document.active_version_id == DocumentVersion.id)
             .where(
                 Document.workspace_id == workspace_id,
-                Document.status == "indexed",
+                DocumentVersion.status == "indexed",
                 DocumentChunk.id.in_(score_by_id),
             )
         )
     ).all()
-    row_by_id = {chunk.id: (chunk, document) for chunk, document in rows}
+    row_by_id = {
+        chunk.id: (chunk, document, version) for chunk, document, version in rows
+    }
     return [
         (*row_by_id[chunk_id], score)
         for chunk_id, score in hits
@@ -50,21 +55,24 @@ async def retrieve_chunks(
     ]
 
 
-async def index_document(db: AsyncSession, document: Document) -> Document:
+async def index_document(
+    db: AsyncSession, document: Document, version: DocumentVersion
+) -> DocumentVersion:
     chunks = list(
         (
             await db.scalars(
                 select(DocumentChunk)
-                .where(DocumentChunk.document_id == document.id)
+                .where(DocumentChunk.version_id == version.id)
                 .order_by(DocumentChunk.position)
             )
         ).all()
     )
-    document.status = "indexing"
-    document.index_error = None
-    document.indexed_at = None
+    version.status = "indexing"
+    version.index_error = None
+    version.indexed_at = None
     await db.commit()
     try:
+        await asyncio.to_thread(store.delete_document, document.id)
         vectors = await gateway.embed_texts([chunk.content for chunk in chunks])
         await asyncio.to_thread(
             store.upsert_chunks,
@@ -75,14 +83,14 @@ async def index_document(db: AsyncSession, document: Document) -> Document:
             vectors,
         )
     except (AIServiceError, VectorStoreError) as error:
-        document.status = "failed"
-        document.index_error = str(error)[:500]
+        version.status = "failed"
+        version.index_error = str(error)[:500]
     else:
-        document.status = "indexed"
-        document.indexed_at = utc_now()
+        version.status = "indexed"
+        version.indexed_at = utc_now()
     await db.commit()
-    await db.refresh(document)
-    return document
+    await db.refresh(version)
+    return version
 
 
 async def answer_question(db: AsyncSession, workspace_id: uuid.UUID, question: str) -> AnswerOut:
@@ -90,15 +98,15 @@ async def answer_question(db: AsyncSession, workspace_id: uuid.UUID, question: s
     if not hits:
         return AnswerOut(answer="当前知识库中没有可用于回答该问题的已索引证据。", citations=[])
 
-    evidence: list[tuple[str, DocumentChunk, Document, float]] = []
-    for chunk, document, score in hits:
+    evidence: list[tuple[str, DocumentChunk, Document, DocumentVersion, float]] = []
+    for chunk, document, version, score in hits:
         label = f"S{len(evidence) + 1}"
-        evidence.append((label, chunk, document, score))
+        evidence.append((label, chunk, document, version, score))
 
     sources = [
-        f"[{label}] 文件：{document.original_name}；"
+        f"[{label}] 文件：{version.original_name}；"
         f"页码：{chunk.page_number or '无'}；内容：{chunk.content}"
-        for label, chunk, document, _ in evidence
+        for label, chunk, _, version, _ in evidence
     ]
     answer = await gateway.answer_with_context(question, sources)
     cited_labels = set(re.findall(r"\[S(\d+)\]", answer))
@@ -107,13 +115,13 @@ async def answer_question(db: AsyncSession, workspace_id: uuid.UUID, question: s
             label=label,
             chunk_id=chunk.id,
             document_id=document.id,
-            original_name=document.original_name,
+            original_name=version.original_name,
             page_number=chunk.page_number,
             position=chunk.position,
             content=chunk.content,
             score=score,
         )
-        for label, chunk, document, score in evidence
+        for label, chunk, document, version, score in evidence
         if label.removeprefix("S") in cited_labels
     ]
     return AnswerOut(answer=answer, citations=citations)

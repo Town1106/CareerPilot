@@ -518,6 +518,37 @@ select:focus {
   white-space: nowrap;
 }
 
+.version-upload {
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.version-upload input {
+  display: none;
+}
+
+.version-history {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f2f3ee;
+  font-size: 12px;
+}
+
+.version-history div {
+  display: grid;
+  grid-template-columns: 32px minmax(120px, 1fr) auto 90px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.version-history code {
+  color: #69716b;
+}
+
 .index-error {
   grid-column: 2 / -1;
   margin: -8px 0 0;
@@ -691,6 +722,19 @@ select:focus {
   }
 
   .document-row .document-status {
+    display: none;
+  }
+
+  .version-history {
+    grid-column: 1 / -1;
+  }
+
+  .version-history div {
+    grid-template-columns: 1fr auto;
+  }
+
+  .version-history code,
+  .version-history div span:last-child {
     display: none;
   }
 

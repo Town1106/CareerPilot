@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api";
-import type { Document, RagAnswer, Workspace } from "../../types";
+import type { Document, DocumentVersion, RagAnswer, Workspace } from "../../types";
 
 const CATEGORY_NAMES = { resume: "简历", project: "项目资料", other: "其他资料" };
 const STATUS_NAMES: Record<string, string> = {
@@ -18,6 +18,9 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [indexingId, setIndexingId] = useState<string | null>(null);
+  const [versioningId, setVersioningId] = useState<string | null>(null);
+  const [openVersionsId, setOpenVersionsId] = useState<string | null>(null);
+  const [versions, setVersions] = useState<Record<string, DocumentVersion[]>>({});
   const [reindexing, setReindexing] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -95,6 +98,49 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
     } finally {
       setReindexing(false);
     }
+  }
+
+  async function uploadVersion(document: Document, nextFile: File) {
+    const body = new FormData();
+    body.append("file", nextFile);
+    setVersioningId(document.id);
+    setError("");
+    try {
+      const updated = await api<Document>(`${url}/${document.id}/versions`, {
+        method: "POST",
+        body,
+      });
+      setDocuments((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+      if (openVersionsId === document.id) {
+        setVersions((items) => ({
+          ...items,
+          [document.id]: [],
+        }));
+        await loadVersions(document.id);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "上传新版本失败");
+    } finally {
+      setVersioningId(null);
+    }
+  }
+
+  async function loadVersions(documentId: string) {
+    try {
+      const items = await api<DocumentVersion[]>(`${url}/${documentId}/versions`);
+      setVersions((current) => ({ ...current, [documentId]: items }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "加载版本历史失败");
+    }
+  }
+
+  async function toggleVersions(documentId: string) {
+    if (openVersionsId === documentId) {
+      setOpenVersionsId(null);
+      return;
+    }
+    setOpenVersionsId(documentId);
+    if (!versions[documentId]) await loadVersions(documentId);
   }
 
   async function ask(event: FormEvent<HTMLFormElement>) {
@@ -183,6 +229,7 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
                     <h3>{document.original_name}</h3>
                     <p>
                       {CATEGORY_NAMES[document.category]}
+                      {" · v"}{document.current_version}
                       {" · "}{(document.size_bytes / 1024).toFixed(1)} KB
                       {" · "}{document.chunk_count} 个文本块
                     </p>
@@ -200,9 +247,41 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
                         {indexingId === document.id ? "索引中…" : document.status === "failed" ? "重试" : "建立索引"}
                       </button>
                     )}
+                    <button className="ghost" onClick={() => void toggleVersions(document.id)}>
+                      {openVersionsId === document.id ? "收起版本" : "版本历史"}
+                    </button>
+                    <label className="ghost version-upload">
+                      {versioningId === document.id ? "上传中…" : "上传新版"}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.txt,.md"
+                        disabled={versioningId === document.id}
+                        onChange={(event) => {
+                          const nextFile = event.target.files?.[0];
+                          if (nextFile) void uploadVersion(document, nextFile);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
                     <button className="danger" onClick={() => void remove(document)}>删除</button>
                   </div>
                   {document.index_error && <p className="index-error">{document.index_error}</p>}
+                  {openVersionsId === document.id && (
+                    <div className="version-history">
+                      {(versions[document.id] || []).map((version) => (
+                        <div key={version.id}>
+                          <strong>
+                            v{version.version}
+                            {version.version === document.current_version ? " · 当前" : ""}
+                          </strong>
+                          <span>{version.original_name}</span>
+                          <span>{(version.size_bytes / 1024).toFixed(1)} KB</span>
+                          <code>{version.sha256.slice(0, 12)}</code>
+                          <span>{STATUS_NAMES[version.status] || version.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

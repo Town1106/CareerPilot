@@ -10,7 +10,7 @@ from app.auth.dependencies import current_user
 from app.auth.models import User
 from app.core.database import get_db
 from app.documents import files
-from app.documents.models import Document
+from app.documents.models import Document, DocumentVersion
 from app.rag import store
 from app.rag.store import VectorStoreError
 from app.workspaces.dependencies import owned_workspace
@@ -72,7 +72,9 @@ async def delete_workspace(
     stored_names = list(
         (
             await db.scalars(
-                select(Document.stored_name).where(Document.workspace_id == workspace.id)
+                select(DocumentVersion.stored_name)
+                .join(Document, Document.id == DocumentVersion.document_id)
+                .where(Document.workspace_id == workspace.id)
             )
         ).all()
     )

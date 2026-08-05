@@ -7,7 +7,7 @@
 - FastAPI 健康检查。
 - 邮箱注册、登录、退出和 HttpOnly Session。
 - 用户工作空间创建、列表、重命名和删除。
-- PDF、DOCX、TXT、Markdown 文档上传、解析、切块和删除。
+- PDF、DOCX、TXT、Markdown 文档上传、SHA-256 去重、版本管理、切块和删除。
 - 使用百炼 Qwen Embedding 与标准库 Sparse 表示将文档块写入本地 Qdrant，并支持失败重试。
 - 基于工作空间隔离的 Dense + Sparse + RRF 混合检索、证据问答和原文引用。
 - React 工作空间与知识库管理界面。

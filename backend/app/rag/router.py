@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import current_user
 from app.auth.models import User
 from app.core.database import get_db
-from app.documents.models import Document
-from app.documents.schemas import DocumentOut
+from app.documents.models import Document, DocumentVersion
+from app.documents.schemas import DocumentOut, document_out
 from app.rag.gateway import AIServiceError
 from app.rag.schemas import AnswerOut, QuestionRequest
 from app.rag.service import answer_question, index_document
@@ -24,14 +24,20 @@ async def reindex_document(
     document_id: uuid.UUID,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-) -> Document:
+) -> DocumentOut:
     await owned_workspace(workspace_id, user, db)
-    document = await db.scalar(
-        select(Document).where(Document.id == document_id, Document.workspace_id == workspace_id)
-    )
-    if not document:
+    row = (
+        await db.execute(
+            select(Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.id == Document.active_version_id)
+            .where(Document.id == document_id, Document.workspace_id == workspace_id)
+        )
+    ).first()
+    if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
-    return await index_document(db, document)
+    document, version = row
+    version = await index_document(db, document, version)
+    return document_out(document, version)
 
 
 @router.post("/rag/ask", response_model=AnswerOut)
@@ -53,15 +59,18 @@ async def reindex_workspace(
     workspace_id: uuid.UUID,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[Document]:
+) -> list[DocumentOut]:
     await owned_workspace(workspace_id, user, db)
-    documents = list(
-        (
-            await db.scalars(
-                select(Document)
-                .where(Document.workspace_id == workspace_id)
-                .order_by(Document.created_at.desc())
-            )
-        ).all()
-    )
-    return [await index_document(db, document) for document in documents]
+    rows = (
+        await db.execute(
+            select(Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.id == Document.active_version_id)
+            .where(Document.workspace_id == workspace_id)
+            .order_by(Document.created_at.desc())
+        )
+    ).all()
+    result = []
+    for document, version in rows:
+        version = await index_document(db, document, version)
+        result.append(document_out(document, version))
+    return result

@@ -15,10 +15,33 @@ class Document(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
     )
     original_name: Mapped[str] = mapped_column(String(255))
+    category: Mapped[str] = mapped_column(String(20))
+    active_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "document_versions.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_documents_active_version_id",
+        ),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+    __table_args__ = (UniqueConstraint("document_id", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    original_name: Mapped[str] = mapped_column(String(255))
     stored_name: Mapped[str] = mapped_column(String(80), unique=True)
     media_type: Mapped[str] = mapped_column(String(100))
-    category: Mapped[str] = mapped_column(String(20))
     size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(20), default="parsed")
     index_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -28,11 +51,11 @@ class Document(Base):
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
-    __table_args__ = (UniqueConstraint("document_id", "position"),)
+    __table_args__ = (UniqueConstraint("version_id", "position"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_versions.id", ondelete="CASCADE"), index=True
     )
     position: Mapped[int] = mapped_column(Integer)
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)

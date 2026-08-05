@@ -92,6 +92,44 @@ def test_parses_docx_with_standard_library() -> None:
     assert files.make_chunks(sections) == [(None, "CareerPilot project")]
 
 
+def test_document_deduplication_and_versions(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
+    workspace_id = register_and_create_workspace(client)
+    url = f"/api/v1/workspaces/{workspace_id}/documents"
+    first = client.post(
+        url,
+        files={"file": ("resume.md", "第一版简历", "text/markdown")},
+    )
+    assert first.status_code == 201, first.text
+    document = first.json()
+    assert document["current_version"] == 1
+    assert len(document["sha256"]) == 64
+
+    duplicate = client.post(
+        url,
+        files={"file": ("copy.md", "第一版简历", "text/markdown")},
+    )
+    assert duplicate.status_code == 409
+    assert len(list(TEST_UPLOAD_DIR.iterdir())) == 1
+
+    second = client.post(
+        f"{url}/{document['id']}/versions",
+        files={"file": ("resume-v2.md", "第二版简历增加项目经验", "text/markdown")},
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["current_version"] == 2
+    assert second.json()["original_name"] == "resume-v2.md"
+
+    versions = client.get(f"{url}/{document['id']}/versions")
+    assert versions.status_code == 200
+    assert [item["version"] for item in versions.json()] == [2, 1]
+    assert len({item["sha256"] for item in versions.json()}) == 2
+    assert len(list(TEST_UPLOAD_DIR.iterdir())) == 2
+
+    assert client.delete(f"{url}/{document['id']}").status_code == 204
+    assert list(TEST_UPLOAD_DIR.iterdir()) == []
+
+
 def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     monkeypatch.setattr(files, "UPLOAD_DIR", TEST_UPLOAD_DIR)
     qdrant = QdrantClient(":memory:", force_disable_check_same_thread=True)
@@ -102,8 +140,9 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
 
     async def fake_answer(question: str, sources: list[str]) -> str:
         assert question == "这个项目使用什么后端框架？"
-        assert "FastAPI" in sources[0]
-        return "项目使用 FastAPI 作为后端框架。[S1]"
+        assert "Django" in sources[0]
+        assert "FastAPI" not in sources[0]
+        return "项目新版使用 Django 作为后端框架。[S1]"
 
     monkeypatch.setattr(gateway, "embed_texts", fake_embeddings)
     monkeypatch.setattr(gateway, "answer_with_context", fake_answer)
@@ -123,6 +162,23 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     assert indexed.status_code == 200, indexed.text
     assert indexed.json()["status"] == "indexed"
 
+    updated = client.post(
+        f"{url}/{uploaded['id']}/versions",
+        files={
+            "file": (
+                "project-v2.md",
+                "CareerPilot 新版使用 Django 开发后端。",
+                "text/markdown",
+            )
+        },
+    )
+    assert updated.status_code == 201, updated.text
+    assert updated.json()["current_version"] == 2
+
+    indexed = client.post(f"{url}/{uploaded['id']}/index")
+    assert indexed.status_code == 200, indexed.text
+    assert indexed.json()["status"] == "indexed"
+
     rebuilt = client.post(f"/api/v1/workspaces/{workspace_id}/rag/reindex")
     assert rebuilt.status_code == 200, rebuilt.text
     assert rebuilt.json()[0]["status"] == "indexed"
@@ -133,7 +189,7 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     )
     assert answer.status_code == 200, answer.text
     assert answer.json()["answer"].endswith("[S1]")
-    assert answer.json()["citations"][0]["original_name"] == "project.md"
+    assert answer.json()["citations"][0]["original_name"] == "project-v2.md"
 
     assert client.delete(f"/api/v1/workspaces/{workspace_id}").status_code == 204
     assert (
