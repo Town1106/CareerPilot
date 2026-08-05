@@ -5,13 +5,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 InterviewType = Literal["technical", "project", "system_design", "behavioral", "mixed"]
+QuestionSourceMode = Literal["all_real", "mixed", "no_search"]
 
 
 class InterviewCreate(BaseModel):
     job_description_id: uuid.UUID
     interview_type: InterviewType = "mixed"
     question_limit: int = Field(default=10, ge=3, le=15)
-    use_web_research: bool = True
+    question_source_mode: QuestionSourceMode = "no_search"
 
 
 class QuestionResult(BaseModel):
@@ -102,7 +103,7 @@ class InterviewOut(BaseModel):
     job_name: str | None
     interview_type: str
     question_limit: int
-    use_web_research: bool
+    question_source_mode: QuestionSourceMode
     status: str
     overall_score: float | None
     report_summary: str | None

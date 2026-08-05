@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api";
-import type { CompetencyGap, Job, JobAnalysis, JobComparison, JobResearch, Workspace } from "../../types";
+import type { CompetencyGap, Job, JobAnalysis, JobComparison, Workspace } from "../../types";
 
 const STATUS_NAMES: Record<string, string> = {
   draft: "待分析",
@@ -15,23 +15,12 @@ const COVERAGE_NAMES: Record<string, string> = {
   uncovered: "未覆盖",
   conflict: "证据冲突",
 };
-const RESEARCH_STAGE_NAMES: Record<string, string> = {
-  technical: "技术面",
-  project: "项目面",
-  system_design: "系统设计",
-  behavioral: "行为面",
-};
-
 export function JobsView({ workspace, onBack, onInterviews }: { workspace: Workspace; onBack: () => void; onInterviews: () => void }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
   const [rawText, setRawText] = useState("");
   const [creating, setCreating] = useState(false);
-  const [autoResearch, setAutoResearch] = useState(true);
-  const [researchingId, setResearchingId] = useState<string | null>(null);
-  const [researchByJob, setResearchByJob] = useState<Record<string, JobResearch>>({});
-  const [research, setResearch] = useState<JobResearch | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<JobAnalysis | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -48,10 +37,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
       ]);
       setJobs(jobItems);
       setGaps(gapItems);
-      const researchItems = await Promise.all(jobItems.map((job) =>
-        api<JobResearch>(`${url}/${job.id}/research`)
-      ));
-      setResearchByJob(Object.fromEntries(researchItems.map((item) => [item.job_description_id, item])));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "加载 JD 失败");
     }
@@ -74,8 +59,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
       setCompany("");
       setTitle("");
       setRawText("");
-      setCreating(false);
-      if (autoResearch) await searchResearch(job);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存 JD 失败");
     } finally {
@@ -99,32 +82,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
     }
   }
 
-  async function searchResearch(job: Job, refresh = false) {
-    setResearchingId(job.id);
-    setError("");
-    try {
-      const result = await api<JobResearch>(`${url}/${job.id}/research${refresh ? "?refresh=true" : ""}`, {
-        method: "POST",
-      });
-      setResearchByJob((items) => ({ ...items, [job.id]: result }));
-      setResearch(result);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "搜索公司面经失败");
-      const result = await api<JobResearch>(`${url}/${job.id}/research`).catch(() => null);
-      if (result) setResearchByJob((items) => ({ ...items, [job.id]: result }));
-    } finally {
-      setResearchingId(null);
-    }
-  }
-
-  async function showResearch(job: Job) {
-    try {
-      setResearch(await api<JobResearch>(`${url}/${job.id}/research`));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "加载公司面经失败");
-    }
-  }
-
   async function showAnalysis(job: Job) {
     try {
       setAnalysis(await api<JobAnalysis>(`${url}/${job.id}/requirements`));
@@ -140,12 +97,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
       setJobs((items) => items.filter((item) => item.id !== job.id));
       setSelectedIds((items) => items.filter((id) => id !== job.id));
       if (analysis?.job.id === job.id) setAnalysis(null);
-      if (research?.job_description_id === job.id) setResearch(null);
-      setResearchByJob((items) => {
-        const next = { ...items };
-        delete next[job.id];
-        return next;
-      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "删除 JD 失败");
     }
@@ -192,8 +143,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
           <label>公司<input required maxLength={120} value={company} onChange={(event) => setCompany(event.target.value)} /></label>
           <label>岗位<input required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
           <label>JD 原文<textarea required minLength={50} maxLength={30000} value={rawText} onChange={(event) => setRawText(event.target.value)} /></label>
-          <label className="check-label"><input type="checkbox" checked={autoResearch} onChange={(event) => setAutoResearch(event.target.checked)} />保存后联网搜索该公司和岗位的面经</label>
-          <p className="muted search-cost-note">联网搜索会产生百炼搜索与模型调用费用。</p>
           <button className="primary" disabled={creating}>{creating ? "保存中…" : "保存 JD"}</button>
         </form>
 
@@ -207,7 +156,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
               <div className="document-actions">
                 <button className="ghost" disabled={analyzingId === job.id} onClick={() => void analyze(job)}>{analyzingId === job.id ? "分析中…" : job.status === "analyzed" ? "重新分析" : "开始分析"}</button>
                 {job.status === "analyzed" && <button className="ghost" onClick={() => void showAnalysis(job)}>查看</button>}
-                <button className="ghost" disabled={researchingId === job.id} onClick={() => researchByJob[job.id]?.status === "ready" ? void showResearch(job) : void searchResearch(job)}>{researchingId === job.id ? "搜索中…" : researchByJob[job.id]?.status === "ready" ? `面经 ${researchByJob[job.id].questions.length} 题` : "搜索面经"}</button>
                 <button className="danger" onClick={() => void remove(job)}>删除</button>
               </div>
               {job.analysis_error && <p className="index-error">{job.analysis_error}</p>}
@@ -224,13 +172,6 @@ export function JobsView({ workspace, onBack, onInterviews }: { workspace: Works
           <div><span className="coverage-badge">{COVERAGE_NAMES[item.coverage]}</span><h3>{item.competency}</h3><p>{item.raw_evidence}</p><p className="muted">{item.explanation}</p></div>
           {item.evidence.map((evidence) => <details key={evidence.chunk_id || evidence.original_name}><summary>{evidence.original_name || "来源已删除"}{evidence.page_number ? ` · 第 ${evidence.page_number} 页` : ""}</summary><p>{evidence.content || "原文已不可用"}</p></details>)}
         </article>)}</div>
-      </section>}
-
-      {research && <section className="analysis-card research-card">
-        <div className="analysis-heading"><div><p className="eyebrow">WEB INTERVIEW RESEARCH</p><h2>公司面经题库</h2><p className="muted">网络面经仅供参考，不代表公司官方题库。</p></div><button className="ghost" disabled={researchingId === research.job_description_id} onClick={() => { const job = jobs.find((item) => item.id === research.job_description_id); if (job) void searchResearch(job, true); }}>重新搜索</button></div>
-        <p className="research-summary">{research.questions.length} 道问题 · {research.source_count} 个来源{research.searched_at ? ` · ${new Date(research.searched_at).toLocaleString("zh-CN")}` : ""}</p>
-        {research.error && <p className="index-error">最近刷新失败：{research.error}</p>}
-        <div className="research-list">{research.questions.map((item) => <article key={item.id}><div><span>{RESEARCH_STAGE_NAMES[item.interview_stage] || item.interview_stage}</span><span>{item.competency}</span></div><h3>{item.question}</h3><p>{item.excerpt}</p><a href={item.source_url} target="_blank" rel="noreferrer">来源：{item.source_title} ↗</a></article>)}</div>
       </section>}
 
       {comparison && <section className="analysis-card"><p className="eyebrow">JOB COMPARISON</p><h2>多岗位共同要求与差异</h2><h3>共同要求</h3><div className="comparison-tags">{comparison.common.map((item) => <span key={item.competency}>{item.competency}</span>)}</div><h3>差异要求</h3><div className="comparison-tags">{comparison.differences.map((item) => <span key={item.competency}>{item.competency}</span>)}</div></section>}

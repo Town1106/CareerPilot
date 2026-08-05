@@ -27,6 +27,7 @@ from app.jobs.models import (
     JobRequirement,
     ResearchQuestion,
 )
+from app.jobs.research import search_company_questions
 from app.jobs.service import normalize_competency
 from app.rag import gateway
 from app.rag.gateway import AIServiceError
@@ -84,37 +85,67 @@ async def generate_question(
         raise AIServiceError("面试问题未通过结构校验") from error
 
 
+def real_question_quota(session: InterviewSession) -> int:
+    if session.question_source_mode == "all_real":
+        return session.question_limit
+    if session.question_source_mode == "mixed":
+        return (session.question_limit + 1) // 2
+    return 0
+
+
 async def next_turn(
     db: AsyncSession,
     session: InterviewSession,
     rows: list[tuple[JobRequirement, Competency]],
     turns: list[InterviewTurn],
 ) -> InterviewTurn:
-    research_count = sum(turn.source_type == "company_research" for turn in turns)
-    gap_count = len(turns) - research_count
-    if session.use_web_research and research_count <= gap_count:
+    real_target = real_question_quota(session)
+    real_count = sum(turn.source_type == "company_research" for turn in turns)
+    simulated_count = len(turns) - real_count
+    simulated_target = session.question_limit - real_target
+    use_real = session.question_source_mode == "all_real" or (
+        session.question_source_mode == "mixed"
+        and real_count < real_target
+        and (real_count <= simulated_count or simulated_count >= simulated_target)
+    )
+
+    if use_real:
+        job = await db.scalar(
+            select(JobDescription).where(JobDescription.id == session.job_description_id)
+        )
         used_ids = [turn.research_question_id for turn in turns if turn.research_question_id]
         query = (
             select(ResearchQuestion)
             .join(InterviewResearch, InterviewResearch.id == ResearchQuestion.research_id)
-            .where(InterviewResearch.job_description_id == session.job_description_id)
-            .order_by(ResearchQuestion.interview_stage, ResearchQuestion.id)
+            .where(
+                InterviewResearch.workspace_id == session.workspace_id,
+                InterviewResearch.company == job.company,
+                InterviewResearch.job_title == job.title,
+            )
+            .order_by(
+                ResearchQuestion.use_count,
+                ResearchQuestion.last_used_at,
+                ResearchQuestion.id,
+            )
         )
         if session.interview_type != "mixed":
             query = query.where(ResearchQuestion.interview_stage == session.interview_type)
         if used_ids:
             query = query.where(ResearchQuestion.id.not_in(used_ids))
         research_question = await db.scalar(query.limit(1))
-        if research_question:
-            return InterviewTurn(
-                session_id=session.id,
-                research_question_id=research_question.id,
-                competency_name=normalize_competency(research_question.competency),
-                sequence=len(turns) + 1,
-                question=research_question.question,
-                source_type="company_research",
-                source_url=research_question.source_url,
-            )
+        if not research_question:
+            raise InterviewStateError("真实面经题库不足，无法继续本次面试")
+        research_question.use_count += 1
+        research_question.last_used_at = utc_now()
+        return InterviewTurn(
+            session_id=session.id,
+            research_question_id=research_question.id,
+            competency_name=normalize_competency(research_question.competency),
+            sequence=len(turns) + 1,
+            question=research_question.question,
+            source_type="company_research",
+            source_url=research_question.source_url,
+        )
 
     counts = Counter(turn.competency_name for turn in turns)
     requirement, competency = min(rows, key=lambda row: counts[row[1].canonical_name])
@@ -221,7 +252,7 @@ async def get_interview(db: AsyncSession, session: InterviewSession) -> Intervie
         job_name=f"{job.company} · {job.title}" if job else None,
         interview_type=session.interview_type,
         question_limit=session.question_limit,
-        use_web_research=session.use_web_research,
+        question_source_mode=session.question_source_mode,
         status=session.status,
         overall_score=session.overall_score,
         report_summary=session.report_summary,
@@ -256,6 +287,18 @@ async def start_interview(db: AsyncSession, session: InterviewSession) -> Interv
     rows = await requirement_rows(db, session)
     if not rows:
         raise InterviewStateError("目标岗位尚未完成能力分析")
+
+    real_target = real_question_quota(session)
+    if real_target:
+        job = await db.scalar(
+            select(JobDescription).where(JobDescription.id == session.job_description_id)
+        )
+        candidates = await search_company_questions(db, job, real_target, session.interview_type)
+        if len(candidates) < real_target:
+            raise InterviewStateError(
+                f"真实面经题不足：需要 {real_target} 道，仅找到 {len(candidates)} 道"
+            )
+
     db.add(await next_turn(db, session, rows, []))
     session.status = "in_progress"
     session.started_at = utc_now()
@@ -367,7 +410,9 @@ async def submit_answer(db: AsyncSession, session: InterviewSession, answer: str
     if len(turns) >= session.question_limit:
         return await finalize_interview(db, session)
 
-    if assessment.should_follow_up and not current.is_follow_up:
+    simulated_count = sum(turn.source_type != "company_research" for turn in turns)
+    can_follow_up = simulated_count < session.question_limit - real_question_quota(session)
+    if assessment.should_follow_up and not current.is_follow_up and can_follow_up:
         db.add(
             InterviewTurn(
                 session_id=session.id,
@@ -377,7 +422,7 @@ async def submit_answer(db: AsyncSession, session: InterviewSession, answer: str
                 sequence=len(turns) + 1,
                 question=assessment.follow_up_question,
                 is_follow_up=True,
-                source_type=current.source_type,
+                source_type="adaptive_follow_up",
                 source_url=current.source_url,
             )
         )

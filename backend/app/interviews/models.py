@@ -29,7 +29,9 @@ class InterviewSession(Base):
     )
     interview_type: Mapped[str] = mapped_column(String(30))
     question_limit: Mapped[int] = mapped_column(Integer)
-    use_web_research: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    question_source_mode: Mapped[str] = mapped_column(
+        String(20), default="no_search", server_default="no_search"
+    )
     status: Mapped[str] = mapped_column(String(20), default="draft")
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     report_summary: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -26,7 +26,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
   const [jobId, setJobId] = useState("");
   const [interviewType, setInterviewType] = useState("mixed");
   const [questionLimit, setQuestionLimit] = useState(10);
-  const [useWebResearch, setUseWebResearch] = useState(true);
+  const [questionSourceMode, setQuestionSourceMode] = useState<"all_real" | "mixed" | "no_search">("mixed");
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +68,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
           job_description_id: jobId,
           interview_type: interviewType,
           question_limit: questionLimit,
-          use_web_research: useWebResearch,
+          question_source_mode: questionSourceMode,
         }),
       });
       replaceSession(await api<Interview>(`${base}/interviews/${created.id}/start`, {
@@ -195,7 +195,13 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
         <label>目标岗位<select required value={jobId} onChange={(event) => setJobId(event.target.value)}><option value="">请选择已分析岗位</option>{jobs.map((job) => <option key={job.id} value={job.id}>{job.company} · {job.title}</option>)}</select></label>
         <label>面试方向<select value={interviewType} onChange={(event) => setInterviewType(event.target.value)}>{Object.entries(TYPE_NAMES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>题目数量<input type="number" min={3} max={15} value={questionLimit} onChange={(event) => setQuestionLimit(Number(event.target.value))} /></label>
-        <label className="check-label"><input type="checkbox" checked={useWebResearch} onChange={(event) => setUseWebResearch(event.target.checked)} />使用已搜索的公司面经题库</label>
+        <fieldset className="source-mode">
+          <legend>题目来源</legend>
+          <label><input type="radio" name="question-source" value="all_real" checked={questionSourceMode === "all_real"} onChange={() => setQuestionSourceMode("all_real")} />搜索真实面经并全部使用</label>
+          <label><input type="radio" name="question-source" value="mixed" checked={questionSourceMode === "mixed"} onChange={() => setQuestionSourceMode("mixed")} />搜索真实面经但混合使用</label>
+          <label><input type="radio" name="question-source" value="no_search" checked={questionSourceMode === "no_search"} onChange={() => setQuestionSourceMode("no_search")} />不搜索面经</label>
+        </fieldset>
+        {questionSourceMode !== "no_search" && <p className="muted">开始面试时会联网搜索新题；没有新题时会复用该公司和岗位已保存的题目。</p>}
         <button className="primary" disabled={busy || !jobId}>{busy ? "正在准备…" : "开始模拟面试"}</button>
         {jobs.length === 0 && <p className="muted">请先在岗位分析页完成至少一个 JD 分析。</p>}
       </form>

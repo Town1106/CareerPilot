@@ -76,9 +76,15 @@ class InterviewResearch(Base):
     __table_args__ = (UniqueConstraint("job_description_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    job_description_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("job_descriptions.id", ondelete="CASCADE"), index=True
+    # Kept nullable so existing installations can migrate without rebuilding this table.
+    job_description_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("job_descriptions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    company: Mapped[str] = mapped_column(String(120))
+    job_title: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20), default="pending")
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -99,3 +105,5 @@ class ResearchQuestion(Base):
     source_url: Mapped[str] = mapped_column(Text)
     source_title: Mapped[str] = mapped_column(String(500))
     excerpt: Mapped[str] = mapped_column(Text)
+    use_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

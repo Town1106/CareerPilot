@@ -8,7 +8,6 @@ from app.auth.dependencies import current_user
 from app.auth.models import User
 from app.core.database import get_db
 from app.jobs.models import JobDescription
-from app.jobs.research import get_research, search_research
 from app.jobs.schemas import (
     AnalysisOut,
     CompareOut,
@@ -16,7 +15,6 @@ from app.jobs.schemas import (
     GapOut,
     JobCreate,
     JobOut,
-    JobResearchOut,
 )
 from app.jobs.service import analyze_job, compare_jobs, competency_gap, get_analysis
 from app.rag.gateway import AIServiceError
@@ -120,33 +118,6 @@ async def analyze(
     try:
         return await analyze_job(db, job)
     except (AIServiceError, VectorStoreError) as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from None
-
-
-@router.get("/jobs/{job_id}/research", response_model=JobResearchOut)
-async def research_detail(
-    workspace_id: uuid.UUID,
-    job_id: uuid.UUID,
-    user: User = Depends(current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JobResearchOut:
-    await owned_workspace(workspace_id, user, db)
-    return await get_research(db, await owned_job(db, workspace_id, job_id))
-
-
-@router.post("/jobs/{job_id}/research", response_model=JobResearchOut)
-async def research_job(
-    workspace_id: uuid.UUID,
-    job_id: uuid.UUID,
-    refresh: bool = False,
-    user: User = Depends(current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JobResearchOut:
-    await owned_workspace(workspace_id, user, db)
-    job = await owned_job(db, workspace_id, job_id)
-    try:
-        return await search_research(db, job, refresh)
-    except AIServiceError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from None
 
 

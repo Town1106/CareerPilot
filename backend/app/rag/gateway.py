@@ -143,7 +143,15 @@ async def structured_chat(system: str, prompt: str) -> dict:
         raise AIServiceError("百炼返回了无效的结构化响应") from error
 
 
-async def web_search_interview_questions(company: str, role: str) -> tuple[str, list[str]]:
+async def web_search_interview_questions(
+    company: str,
+    role: str,
+    wanted_count: int,
+    interview_type: str,
+    excluded_questions: list[str],
+) -> tuple[str, list[str]]:
+    stage_hint = "不限面试环节" if interview_type == "mixed" else interview_type
+    excluded = "\n".join(f"- {question}" for question in excluded_questions[-100:])
     if not DASHSCOPE_API_KEY:
         raise AIServiceError("未配置 DASHSCOPE_API_KEY")
     async with httpx.AsyncClient(
@@ -162,8 +170,10 @@ async def web_search_interview_questions(company: str, role: str) -> tuple[str, 
                     "不要编造题目或来源。输出简洁研究结果，每道题附上搜索结果中的原始 URL。"
                 ),
                 "input": (
-                    f"搜索“{company} {role} 面试题、面经、技术面、项目面、系统设计”，"
-                    "整理最多 20 道可用于模拟面试的问题。"
+                    f"搜索‘{company} {role} 面试题、面经、技术面、项目面、系统设计’，"
+                    f"目标收集 {wanted_count} 道、面试环节为 {stage_hint} 的真实问题。"
+                    "优先查找不同网页和此前没有收录的新问题；不足时如实返回，不要编造。"
+                    f"\n以下题目已经收录，必须排除：\n{excluded or '无'}"
                 ),
                 "tools": [{"type": "web_search"}],
                 "tool_choice": "required",

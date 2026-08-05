@@ -119,25 +119,3 @@ class ExtractedResearchQuestion(BaseModel):
 
 class ResearchExtraction(BaseModel):
     questions: list[ExtractedResearchQuestion] = Field(min_length=1, max_length=30)
-
-
-class ResearchQuestionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    question: str
-    competency: str
-    interview_stage: str
-    source_url: str
-    source_title: str
-    excerpt: str
-
-
-class JobResearchOut(BaseModel):
-    job_description_id: uuid.UUID
-    status: str
-    error: str | None
-    searched_at: datetime | None
-    expires_at: datetime | None
-    source_count: int
-    questions: list[ResearchQuestionOut]
