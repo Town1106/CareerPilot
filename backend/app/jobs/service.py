@@ -40,6 +40,19 @@ ALIASES = {
 IMPORTANCE = {"must": 3, "responsibility": 2, "preferred": 1}
 COVERAGE_SCORE = {"covered": 1.0, "partial": 0.5, "uncovered": 0.0, "conflict": 0.0}
 COVERAGE_ORDER = {"covered": 0, "partial": 1, "uncovered": 2, "conflict": 3}
+TECHNOLOGIES = (
+    ("spring boot", r"spring\s*boot"),
+    ("restful api", r"rest(?:ful)?\s*api"),
+    ("postgresql", r"postgres(?:ql)?"),
+    ("mysql", r"mysql"),
+    ("redis", r"redis"),
+    ("kubernetes", r"kubernetes|k8s"),
+    ("docker", r"docker"),
+    ("elasticsearch", r"elasticsearch"),
+    ("kafka", r"kafka"),
+    ("java", r"(?<![a-z0-9])java(?![a-z0-9])"),
+)
+TECHNOLOGY_NAMES = {name for name, _ in TECHNOLOGIES}
 
 
 def normalize_competency(name: str) -> str:
@@ -48,9 +61,24 @@ def normalize_competency(name: str) -> str:
     return ALIASES.get(normalized, normalized)
 
 
-def deduplicate_requirements(result: ExtractionResult) -> list[ExtractedRequirement]:
-    unique = {}
+def atomic_requirements(result: ExtractionResult) -> list[ExtractedRequirement]:
+    expanded = []
     for item in result.requirements:
+        for component in re.split(r"\s*[,，、/；;]+\s*", item.name):
+            normalized = component.casefold().strip()
+            names = [name for name, pattern in TECHNOLOGIES if re.search(pattern, normalized)]
+            if ("后端" in normalized or "服务端" in normalized) and "经验" in normalized:
+                names.append("后端开发经验")
+            if not names:
+                names.append(normalize_competency(component))
+            for name in dict.fromkeys(names):
+                category = "technical" if name in TECHNOLOGY_NAMES else item.category
+                if name == "后端开发经验":
+                    category = "experience"
+                expanded.append(item.model_copy(update={"name": name, "category": category}))
+
+    unique = {}
+    for item in expanded:
         key = normalize_competency(item.name)
         existing = unique.get(key)
         if not existing:
@@ -71,6 +99,8 @@ async def extract_requirements(raw_text: str) -> ExtractionResult:
         (
             "你是招聘 JD 结构化抽取器。只抽取原文明确出现的要求，不补充常识。"
             "返回 JSON 对象 requirements，每项包含 name、category、requirement_type、raw_evidence。"
+            "name 必须是单个原子能力，禁止把 Java、Spring Boot、数据库等多个能力放在同一项；"
+            "年限、生产环境等限定条件放在 raw_evidence，不要写入 name。"
             "category 只能是 technical、experience、responsibility、soft_skill；"
             "requirement_type 只能是 must、preferred、responsibility。"
         ),
@@ -104,11 +134,13 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
     await db.commit()
     try:
         extraction = await extract_requirements(job.raw_text)
-        extracted_items = deduplicate_requirements(extraction)
+        extracted_items = atomic_requirements(extraction)
         drafts = []
         candidate_by_label = {}
         for index, item in enumerate(extracted_items):
-            hits = await retrieve_chunks(db, job.workspace_id, item.name, limit=3)
+            hits = await retrieve_chunks(
+                db, job.workspace_id, f"{item.name}；{item.raw_evidence}", limit=3
+            )
             candidates = []
             for position, (chunk, document, version, score) in enumerate(hits, 1):
                 label = f"R{index}S{position}"

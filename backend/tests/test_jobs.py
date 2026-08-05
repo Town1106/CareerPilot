@@ -7,9 +7,64 @@ from qdrant_client import QdrantClient
 
 from app.documents import files
 from app.documents import router as documents_router
+from app.jobs.schemas import ExtractedRequirement, ExtractionResult
+from app.jobs.service import atomic_requirements
 from app.rag import gateway, store
 
 TEST_UPLOAD_DIR = Path(__file__).parent / "_uploads"
+
+
+def test_atomic_requirements_normalizes_grouped_jd_terms() -> None:
+    result = ExtractionResult(
+        requirements=[
+            ExtractedRequirement(
+                name="Java, Spring Boot, RESTful API",
+                category="technical",
+                requirement_type="must",
+                raw_evidence="熟悉 Java、Spring Boot 和 RESTful API",
+            ),
+            ExtractedRequirement(
+                name="Java 后端开发经验",
+                category="experience",
+                requirement_type="must",
+                raw_evidence="具备 Java 后端开发经验",
+            ),
+            ExtractedRequirement(
+                name="MySQL/PostgreSQL, SQL 优化",
+                category="technical",
+                requirement_type="must",
+                raw_evidence="熟悉 MySQL/PostgreSQL 和 SQL 优化",
+            ),
+            ExtractedRequirement(
+                name="Kubernetes 生产环境运维经验",
+                category="experience",
+                requirement_type="preferred",
+                raw_evidence="有 Kubernetes 生产环境运维经验",
+            ),
+            ExtractedRequirement(
+                name="五年以上后端开发经验",
+                category="experience",
+                requirement_type="must",
+                raw_evidence="五年以上后端开发经验",
+            ),
+        ]
+    )
+
+    requirements = atomic_requirements(result)
+    by_name = {item.name: item for item in requirements}
+    assert set(by_name) == {
+        "java",
+        "spring boot",
+        "restful api",
+        "后端开发经验",
+        "mysql",
+        "postgresql",
+        "sql 优化",
+        "kubernetes",
+    }
+    assert by_name["java"].category == "technical"
+    assert by_name["kubernetes"].category == "technical"
+    assert by_name["后端开发经验"].category == "experience"
 
 
 def create_workspace(client: TestClient) -> str:
