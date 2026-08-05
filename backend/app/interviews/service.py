@@ -423,7 +423,6 @@ async def submit_answer(db: AsyncSession, session: InterviewSession, answer: str
                 question=assessment.follow_up_question,
                 is_follow_up=True,
                 source_type="adaptive_follow_up",
-                source_url=current.source_url,
             )
         )
     else:
