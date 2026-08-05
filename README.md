@@ -8,8 +8,8 @@
 - 邮箱注册、登录、退出和 HttpOnly Session。
 - 用户工作空间创建、列表、重命名和删除。
 - PDF、DOCX、TXT、Markdown 文档上传、解析、切块和删除。
-- 使用百炼 Qwen Embedding 将文档块写入本地 Qdrant，并支持失败重试。
-- 基于工作空间隔离的语义检索、证据问答和原文引用。
+- 使用百炼 Qwen Embedding 与标准库 Sparse 表示将文档块写入本地 Qdrant，并支持失败重试。
+- 基于工作空间隔离的 Dense + Sparse + RRF 混合检索、证据问答和原文引用。
 - React 工作空间与知识库管理界面。
 
 ## 快速启动
@@ -32,6 +32,7 @@ RAG 使用以下环境变量（参照 `.env.example`）：
     DASHSCOPE_CHAT_MODEL=qwen3.7-plus
     DASHSCOPE_EMBEDDING_MODEL=qwen3.7-text-embedding
     DASHSCOPE_EMBEDDING_DIMENSIONS=1024
+    RAG_RETRIEVAL_MODE=hybrid
 
 开发环境的 Qdrant 使用嵌入式本地模式，数据保存在 `backend/data/qdrant`，无需手动建库。该模式只适合单个后端进程；需要多进程或部署时再切换到 Qdrant Server。
 
@@ -60,6 +61,14 @@ RAG 使用以下环境变量（参照 `.env.example`）：
     cd D:\codex-project\match\backend
     python -m uv run pytest
     python -m uv run ruff check .
+
+Dense RAG 基线评测（读取根目录 `.env` 中的百炼配置）：
+
+    python -m uv run --env-file ../.env python -m app.rag.evaluate
+
+结果写入 `backend/evals/results/dense-hybrid-comparison.json`，同时报告 Dense、Hybrid 和差值。
+
+从旧版 Dense Collection 升级后，在知识库页面点击一次“重建全部索引”，即可为已有文档补充 Sparse 索引。
 
 前端：
 

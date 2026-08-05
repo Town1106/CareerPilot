@@ -18,6 +18,7 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [indexingId, setIndexingId] = useState<string | null>(null);
+  const [reindexing, setReindexing] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [result, setResult] = useState<RagAnswer | null>(null);
@@ -82,6 +83,20 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
     }
   }
 
+  async function reindexAll() {
+    setReindexing(true);
+    setError("");
+    try {
+      setDocuments(await api<Document[]>(`/api/v1/workspaces/${workspace.id}/rag/reindex`, {
+        method: "POST",
+      }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "重建索引失败");
+    } finally {
+      setReindexing(false);
+    }
+  }
+
   async function ask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = question.trim();
@@ -109,7 +124,15 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
           <h1>{workspace.name}</h1>
           <p className="muted">上传简历和项目资料，为后续证据检索建立可靠来源。</p>
         </div>
-        <div className="status-pill"><span /> 数据库已连接</div>
+        <div>
+          <button
+            className="ghost"
+            disabled={reindexing || documents.length === 0}
+            onClick={() => void reindexAll()}
+          >
+            {reindexing ? "正在重建…" : "重建全部索引"}
+          </button>
+        </div>
       </div>
 
       <div className="knowledge-grid">

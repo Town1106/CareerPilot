@@ -1,0 +1,127 @@
+{
+  "name": "careerpilot-rag-v0.1",
+  "chunks": [
+    {
+      "id": "resume-java",
+      "text": "候选人有三年 Java 后端经验，熟悉 Spring Boot、MyBatis 和 REST API 开发，负责过订单服务的接口设计与性能优化。"
+    },
+    {
+      "id": "resume-database",
+      "text": "候选人使用 PostgreSQL 和 MySQL，能够设计索引、分析慢查询，并通过 EXPLAIN 优化复杂 SQL。"
+    },
+    {
+      "id": "resume-python",
+      "text": "候选人使用 Python、FastAPI 和 SQLAlchemy 开发过异步 Web 服务，并为核心接口编写 pytest 自动化测试。"
+    },
+    {
+      "id": "project-stack",
+      "text": "CareerPilot 前端采用 React、TypeScript 和 Vite，后端采用 FastAPI，业务数据由 PostgreSQL 保存。"
+    },
+    {
+      "id": "project-rag",
+      "text": "CareerPilot 使用百炼 Qwen Embedding 生成 1024 维向量，将文档块写入 Qdrant，并按 workspace_id 隔离检索。"
+    },
+    {
+      "id": "project-citations",
+      "text": "知识库问答只基于召回证据生成回答，回答中的 S1、S2 标记会映射到文档名称、页码和原文片段。"
+    },
+    {
+      "id": "project-auth",
+      "text": "账户模块使用 Argon2 哈希密码，通过 HttpOnly Session Cookie 维持登录状态，并在查询中校验工作空间归属。"
+    },
+    {
+      "id": "project-documents",
+      "text": "文档模块支持 PDF、DOCX、TXT 和 Markdown，限制单文件不超过 10 MB，解析后按段落和长度生成文本块。"
+    },
+    {
+      "id": "project-storage",
+      "text": "PostgreSQL 是文档和 Chunk 的事实来源，Qdrant 只保存可重建向量；删除文档或工作空间时同步清理向量。"
+    },
+    {
+      "id": "distractor-frontend",
+      "text": "另一个作品使用 Vue、JavaScript 和 Webpack 构建管理后台，服务端由 Node.js 和 MongoDB 提供数据。"
+    },
+    {
+      "id": "distractor-python",
+      "text": "数据分析脚本使用 Python、Pandas 和 Jupyter Notebook 清洗销售记录，没有提供 Web API。"
+    },
+    {
+      "id": "distractor-vector",
+      "text": "实验项目使用 OpenAI Embedding 生成 1536 维向量，并将结果存入 pgvector，所有用户共享同一索引。"
+    },
+    {
+      "id": "distractor-auth",
+      "text": "移动应用使用 bcrypt 保存密码，通过存放在 localStorage 中的 JWT 访问后端接口。"
+    },
+    {
+      "id": "distractor-documents",
+      "text": "图片素材平台只接受 PNG 和 JPEG，单文件限制为 20 MB，上传后生成缩略图。"
+    },
+    {
+      "id": "distractor-storage",
+      "text": "日志检索系统将 Elasticsearch 作为唯一数据源，删除索引后无法从其他数据库重建。"
+    },
+    {
+      "id": "distractor-java",
+      "text": "Android 客户端岗位需要 Java、Kotlin 和 Jetpack Compose，要求熟悉移动端生命周期。"
+    },
+    {
+      "id": "distractor-ai-job",
+      "text": "算法研究岗位要求 PyTorch、CUDA、模型训练和论文复现经验，不涉及 RAG 或 Web 服务开发。"
+    },
+    {
+      "id": "distractor-testing",
+      "text": "前端项目使用 Jest 和 Playwright 进行自动化测试，后端没有采用 pytest。"
+    },
+    {
+      "id": "distractor-citations",
+      "text": "学术写作工具按照 APA 格式生成参考文献列表，但不会展示上传资料的原文片段。"
+    },
+    {
+      "id": "distractor-database",
+      "text": "缓存服务只使用 Redis 保存临时键值，不使用 PostgreSQL 或 MySQL，也没有关系型数据库索引。"
+    },
+    {
+      "id": "distractor-file-parser",
+      "text": "邮件导入器解析 EML 和 MSG 文件，限制附件不超过 25 MB，并按发件人组织内容。"
+    },
+    {
+      "id": "jd-java-required",
+      "text": "Java 后端岗位要求熟练掌握 Java、Spring Boot、关系型数据库、RESTful API，并具备两年以上服务端开发经验。"
+    },
+    {
+      "id": "jd-java-plus",
+      "text": "Java 后端岗位加分项包括 Redis、消息队列、Docker、Kubernetes，以及大型系统性能调优经验。"
+    },
+    {
+      "id": "jd-ai-required",
+      "text": "AI 应用工程师岗位要求 Python、FastAPI、RAG、向量数据库和大模型 API 集成经验，熟悉评测与提示词安全者优先。"
+    }
+  ],
+  "cases": [
+    {"id": "q01", "question": "候选人有多少年 Java 后端经验？", "relevant_chunk_ids": ["resume-java"]},
+    {"id": "q02", "question": "候选人用过哪些 Java 框架？", "relevant_chunk_ids": ["resume-java"]},
+    {"id": "q03", "question": "候选人是否会分析和优化慢 SQL？", "relevant_chunk_ids": ["resume-database"]},
+    {"id": "q04", "question": "候选人使用过哪些关系型数据库？", "relevant_chunk_ids": ["resume-database"]},
+    {"id": "q05", "question": "候选人的 Python Web 开发技术栈是什么？", "relevant_chunk_ids": ["resume-python"]},
+    {"id": "q06", "question": "项目的前端和后端分别采用什么框架？", "relevant_chunk_ids": ["project-stack"]},
+    {"id": "q07", "question": "CareerPilot 的业务数据保存在哪里？", "relevant_chunk_ids": ["project-stack", "project-storage"]},
+    {"id": "q08", "question": "项目使用什么模型生成多少维的向量？", "relevant_chunk_ids": ["project-rag"]},
+    {"id": "q09", "question": "向量检索如何隔离不同工作空间？", "relevant_chunk_ids": ["project-rag"]},
+    {"id": "q10", "question": "知识库回答如何让用户追溯原文？", "relevant_chunk_ids": ["project-citations"]},
+    {"id": "q11", "question": "回答里的 S1 和 S2 有什么作用？", "relevant_chunk_ids": ["project-citations"]},
+    {"id": "q12", "question": "用户密码采用什么算法保存？", "relevant_chunk_ids": ["project-auth"]},
+    {"id": "q13", "question": "系统如何保持用户登录状态？", "relevant_chunk_ids": ["project-auth"]},
+    {"id": "q14", "question": "可以上传哪些格式的资料？", "relevant_chunk_ids": ["project-documents"]},
+    {"id": "q15", "question": "上传文件的大小限制是多少？", "relevant_chunk_ids": ["project-documents"]},
+    {"id": "q16", "question": "为什么 Qdrant 不是文档事实来源？", "relevant_chunk_ids": ["project-storage"]},
+    {"id": "q17", "question": "删除工作空间后向量如何处理？", "relevant_chunk_ids": ["project-storage"]},
+    {"id": "q18", "question": "Java 岗位有哪些必须掌握的技术？", "relevant_chunk_ids": ["jd-java-required"]},
+    {"id": "q19", "question": "Java 岗位要求几年服务端经验？", "relevant_chunk_ids": ["jd-java-required"]},
+    {"id": "q20", "question": "哪些基础设施技术属于 Java 岗位加分项？", "relevant_chunk_ids": ["jd-java-plus"]},
+    {"id": "q21", "question": "AI 应用岗位需要哪些 RAG 相关能力？", "relevant_chunk_ids": ["jd-ai-required"]},
+    {"id": "q22", "question": "哪个岗位明确要求大模型 API 集成经验？", "relevant_chunk_ids": ["jd-ai-required"]},
+    {"id": "q23", "question": "候选人的经历覆盖 Java 岗位的 Spring Boot 要求吗？", "relevant_chunk_ids": ["resume-java", "jd-java-required"]},
+    {"id": "q24", "question": "候选人的项目是否覆盖 AI 岗位的 FastAPI 和向量数据库要求？", "relevant_chunk_ids": ["resume-python", "project-rag", "jd-ai-required"]}
+  ]
+}

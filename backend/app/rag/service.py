@@ -5,13 +5,49 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import RAG_TOP_K
+from app.core.config import RAG_RETRIEVAL_MODE, RAG_TOP_K
 from app.core.database import utc_now
 from app.documents.models import Document, DocumentChunk
 from app.rag import gateway, store
 from app.rag.gateway import AIServiceError
 from app.rag.schemas import AnswerOut, CitationOut
 from app.rag.store import VectorStoreError
+
+
+async def retrieve_chunks(
+    db: AsyncSession, workspace_id: uuid.UUID, question: str, limit: int = RAG_TOP_K
+) -> list[tuple[DocumentChunk, Document, float]]:
+    if not await db.scalar(
+        select(Document.id).where(
+            Document.workspace_id == workspace_id, Document.status == "indexed"
+        )
+    ):
+        return []
+    query_vector = (await gateway.embed_texts([question]))[0]
+    hits = await asyncio.to_thread(
+        store.search, workspace_id, query_vector, question, limit, RAG_RETRIEVAL_MODE
+    )
+    if not hits:
+        return []
+
+    score_by_id = dict(hits)
+    rows = (
+        await db.execute(
+            select(DocumentChunk, Document)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(
+                Document.workspace_id == workspace_id,
+                Document.status == "indexed",
+                DocumentChunk.id.in_(score_by_id),
+            )
+        )
+    ).all()
+    row_by_id = {chunk.id: (chunk, document) for chunk, document in rows}
+    return [
+        (*row_by_id[chunk_id], score)
+        for chunk_id, score in hits
+        if chunk_id in row_by_id
+    ]
 
 
 async def index_document(db: AsyncSession, document: Document) -> Document:
@@ -35,6 +71,7 @@ async def index_document(db: AsyncSession, document: Document) -> Document:
             document.workspace_id,
             document.id,
             [chunk.id for chunk in chunks],
+            [chunk.content for chunk in chunks],
             vectors,
         )
     except (AIServiceError, VectorStoreError) as error:
@@ -49,38 +86,14 @@ async def index_document(db: AsyncSession, document: Document) -> Document:
 
 
 async def answer_question(db: AsyncSession, workspace_id: uuid.UUID, question: str) -> AnswerOut:
-    if not await db.scalar(
-        select(Document.id).where(
-            Document.workspace_id == workspace_id, Document.status == "indexed"
-        )
-    ):
-        return AnswerOut(answer="当前知识库中没有可用于回答该问题的已索引证据。", citations=[])
-    query_vector = (await gateway.embed_texts([question]))[0]
-    hits = await asyncio.to_thread(store.search, workspace_id, query_vector, RAG_TOP_K)
+    hits = await retrieve_chunks(db, workspace_id, question)
     if not hits:
         return AnswerOut(answer="当前知识库中没有可用于回答该问题的已索引证据。", citations=[])
 
-    score_by_id = dict(hits)
-    rows = (
-        await db.execute(
-            select(DocumentChunk, Document)
-            .join(Document, Document.id == DocumentChunk.document_id)
-            .where(
-                Document.workspace_id == workspace_id,
-                Document.status == "indexed",
-                DocumentChunk.id.in_(score_by_id),
-            )
-        )
-    ).all()
-    row_by_id = {chunk.id: (chunk, document) for chunk, document in rows}
     evidence: list[tuple[str, DocumentChunk, Document, float]] = []
-    for chunk_id, score in hits:
-        if chunk_id in row_by_id:
-            chunk, document = row_by_id[chunk_id]
-            label = f"S{len(evidence) + 1}"
-            evidence.append((label, chunk, document, score))
-    if not evidence:
-        return AnswerOut(answer="检索结果未通过数据库归属校验，无法生成答案。", citations=[])
+    for chunk, document, score in hits:
+        label = f"S{len(evidence) + 1}"
+        evidence.append((label, chunk, document, score))
 
     sources = [
         f"[{label}] 文件：{document.original_name}；"

@@ -46,3 +46,22 @@ async def ask(
         return await answer_question(db, workspace_id, payload.question.strip())
     except (AIServiceError, VectorStoreError) as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from None
+
+
+@router.post("/rag/reindex", response_model=list[DocumentOut])
+async def reindex_workspace(
+    workspace_id: uuid.UUID,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[Document]:
+    await owned_workspace(workspace_id, user, db)
+    documents = list(
+        (
+            await db.scalars(
+                select(Document)
+                .where(Document.workspace_id == workspace_id)
+                .order_by(Document.created_at.desc())
+            )
+        ).all()
+    )
+    return [await index_document(db, document) for document in documents]

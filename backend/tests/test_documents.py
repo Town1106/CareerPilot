@@ -123,6 +123,10 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     assert indexed.status_code == 200, indexed.text
     assert indexed.json()["status"] == "indexed"
 
+    rebuilt = client.post(f"/api/v1/workspaces/{workspace_id}/rag/reindex")
+    assert rebuilt.status_code == 200, rebuilt.text
+    assert rebuilt.json()[0]["status"] == "indexed"
+
     answer = client.post(
         f"/api/v1/workspaces/{workspace_id}/rag/ask",
         json={"question": "这个项目使用什么后端框架？"},
@@ -132,5 +136,14 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     assert answer.json()["citations"][0]["original_name"] == "project.md"
 
     assert client.delete(f"/api/v1/workspaces/{workspace_id}").status_code == 204
-    assert store.search(uuid.UUID(workspace_id), [1.0] + [0.0] * 1023, 5) == []
+    assert (
+        store.search(
+            uuid.UUID(workspace_id),
+            [1.0] + [0.0] * 1023,
+            "FastAPI",
+            5,
+            "hybrid",
+        )
+        == []
+    )
     qdrant.close()
