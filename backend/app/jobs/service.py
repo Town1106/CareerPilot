@@ -53,6 +53,34 @@ TECHNOLOGIES = (
     ("java", r"(?<![a-z0-9])java(?![a-z0-9])"),
 )
 TECHNOLOGY_NAMES = {name for name, _ in TECHNOLOGIES}
+CATEGORY_ALIASES = {
+    "technical": "technical",
+    "framework": "technical",
+    "tool": "technical",
+    "skill": "technical",
+    "experience": "experience",
+    "responsibility": "responsibility",
+    "responsibilities": "responsibility",
+    "soft_skill": "soft_skill",
+    "soft skill": "soft_skill",
+}
+REQUIREMENT_TYPE_ALIASES = {
+    "must": "must",
+    "required": "must",
+    "mandatory": "must",
+    "preferred": "preferred",
+    "bonus": "preferred",
+    "plus": "preferred",
+    "nice_to_have": "preferred",
+    "responsibility": "responsibility",
+    "responsibilities": "responsibility",
+}
+
+
+class RequirementExtractionError(AIServiceError):
+    def __init__(self, message: str, raw_output: str):
+        super().__init__(message)
+        self.raw_output = raw_output
 
 
 def normalize_competency(name: str) -> str:
@@ -91,10 +119,12 @@ def atomic_requirements(result: ExtractionResult) -> list[ExtractedRequirement]:
         )
         evidence = "；".join(dict.fromkeys([existing.raw_evidence, item.raw_evidence]))
         unique[key] = preferred.model_copy(update={"raw_evidence": evidence})
-    return list(unique.values())
+    return sorted(
+        unique.values(), key=lambda item: -IMPORTANCE[item.requirement_type]
+    )[:30]
 
 
-async def extract_requirements(raw_text: str) -> ExtractionResult:
+async def extract_requirements(raw_text: str) -> tuple[ExtractionResult, str]:
     payload = await gateway.structured_chat(
         (
             "你是招聘 JD 结构化抽取器。只抽取原文明确出现的要求，不补充常识。"
@@ -106,10 +136,44 @@ async def extract_requirements(raw_text: str) -> ExtractionResult:
         ),
         raw_text,
     )
-    try:
-        return ExtractionResult.model_validate(payload)
-    except ValidationError as error:
-        raise AIServiceError("JD 结构化结果未通过校验") from error
+    raw_output = json.dumps(payload, ensure_ascii=False)
+    raw_requirements = payload.get("requirements") if isinstance(payload, dict) else None
+    if not isinstance(raw_requirements, list):
+        raise RequirementExtractionError("JD 结构化结果缺少 requirements 列表", raw_output)
+    requirements = []
+    ignored = []
+    for index, item in enumerate(raw_requirements):
+        if not isinstance(item, dict):
+            ignored.append(f"第 {index + 1} 项不是对象")
+            continue
+        name = item.get("name")
+        evidence = item.get("raw_evidence")
+        category = CATEGORY_ALIASES.get(str(item.get("category", "")).casefold())
+        requirement_type = REQUIREMENT_TYPE_ALIASES.get(
+            str(item.get("requirement_type", "")).casefold()
+        )
+        if not category or not requirement_type:
+            ignored.append(f"第 {index + 1} 项类别或类型无效")
+            continue
+        if not isinstance(name, str) or not isinstance(evidence, str):
+            ignored.append(f"第 {index + 1} 项缺少文本字段")
+            continue
+        try:
+            requirements.append(
+                ExtractedRequirement(
+                    name=name.strip()[:120],
+                    category=category,
+                    requirement_type=requirement_type,
+                    raw_evidence=evidence.strip()[:1000],
+                )
+            )
+        except ValidationError:
+            ignored.append(f"第 {index + 1} 项内容为空或超出限制")
+    if not requirements:
+        detail = f"；{'；'.join(ignored[:3])}" if ignored else ""
+        raise RequirementExtractionError(f"JD 结构化结果无有效要求{detail}", raw_output)
+    requirements.sort(key=lambda item: -IMPORTANCE[item.requirement_type])
+    return ExtractionResult(requirements=requirements[:30]), raw_output
 
 
 async def judge_evidence(requirements: list[dict]) -> JudgmentResult:
@@ -132,8 +196,10 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
     job.status = "analyzing"
     job.analysis_error = None
     await db.commit()
+    raw_output = None
     try:
-        extraction = await extract_requirements(job.raw_text)
+        extraction, raw_output = await extract_requirements(job.raw_text)
+        job.analysis_raw_output = raw_output
         extracted_items = atomic_requirements(extraction)
         drafts = []
         candidate_by_label = {}
@@ -235,6 +301,7 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
         await db.rollback()
         job.status = "failed"
         job.analysis_error = str(error)[:500]
+        job.analysis_raw_output = raw_output or getattr(error, "raw_output", None)
         await db.commit()
         raise
     await db.refresh(job)

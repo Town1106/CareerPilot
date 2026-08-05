@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -8,10 +9,71 @@ from qdrant_client import QdrantClient
 from app.documents import files
 from app.documents import router as documents_router
 from app.jobs.schemas import ExtractedRequirement, ExtractionResult
-from app.jobs.service import atomic_requirements
+from app.jobs.service import (
+    RequirementExtractionError,
+    atomic_requirements,
+    extract_requirements,
+)
 from app.rag import gateway, store
 
 TEST_UPLOAD_DIR = Path(__file__).parent / "_uploads"
+
+
+def test_extract_requirements_tolerates_large_agent_jd_output(monkeypatch) -> None:
+    valid = [
+        {
+            "name": f"Agent 能力 {index}",
+            "category": "framework" if index == 0 else "technical",
+            "requirement_type": "required" if index == 0 else "must",
+            "raw_evidence": f"岗位要求 Agent 能力 {index}",
+        }
+        for index in range(31)
+    ]
+    valid.extend(
+        [
+            {
+                "name": "AI 开源贡献",
+                "category": "experience",
+                "requirement_type": "bonus",
+                "raw_evidence": "有 AI 开源项目核心贡献经验",
+            },
+            {
+                "name": "本科及以上学历",
+                "category": "education",
+                "requirement_type": "must",
+                "raw_evidence": "本科及以上学历",
+            },
+        ]
+    )
+
+    async def fake_structured(_: str, __: str) -> dict:
+        return {"requirements": valid}
+
+    monkeypatch.setattr(gateway, "structured_chat", fake_structured)
+    result, raw_output = asyncio.run(extract_requirements("Agent 岗位 JD"))
+    assert len(result.requirements) == 30
+    assert result.requirements[0].category == "technical"
+    assert all(item.category != "education" for item in result.requirements)
+    assert "Agent 能力 0" in raw_output
+
+
+def test_extract_requirements_reports_specific_invalid_reason(monkeypatch) -> None:
+    async def fake_structured(_: str, __: str) -> dict:
+        return {
+            "requirements": [
+                {
+                    "name": "本科及以上学历",
+                    "category": "education",
+                    "requirement_type": "must",
+                    "raw_evidence": "本科及以上学历",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(gateway, "structured_chat", fake_structured)
+    with pytest.raises(RequirementExtractionError, match="无有效要求") as error:
+        asyncio.run(extract_requirements("测试 JD"))
+    assert "education" in error.value.raw_output
 
 
 def test_atomic_requirements_normalizes_grouped_jd_terms() -> None:

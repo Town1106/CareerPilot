@@ -20,6 +20,7 @@ class JobDescription(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     coverage_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     analysis_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    analysis_raw_output: Mapped[str | None] = mapped_column(Text, nullable=True)
     analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
