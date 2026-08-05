@@ -16,7 +16,7 @@ const COVERAGE_NAMES: Record<string, string> = {
   conflict: "证据冲突",
 };
 
-export function JobsView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
+export function JobsView({ workspace, onBack, onInterviews }: { workspace: Workspace; onBack: () => void; onInterviews: () => void }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
@@ -129,9 +129,12 @@ export function JobsView({ workspace, onBack }: { workspace: Workspace; onBack: 
           <h1>岗位能力差距</h1>
           <p className="muted">将 JD 要求与当前版本的简历、项目资料逐项核验。</p>
         </div>
-        <button className="ghost" disabled={selectedIds.length < 2} onClick={() => void compare()}>
-          比较已选岗位（{selectedIds.length}）
-        </button>
+        <div className="header-actions">
+          <button className="primary" onClick={onInterviews}>模拟面试</button>
+          <button className="ghost" disabled={selectedIds.length < 2} onClick={() => void compare()}>
+            比较已选岗位（{selectedIds.length}）
+          </button>
+        </div>
       </div>
 
       <div className="jobs-grid">

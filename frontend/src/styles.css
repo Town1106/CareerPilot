@@ -519,6 +519,183 @@ select:focus {
   gap: 8px;
 }
 
+.interview-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.5fr);
+  gap: 18px;
+}
+
+.interview-grid .job-form textarea {
+  min-height: auto;
+}
+
+.session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #e2e2dc;
+}
+
+.session-row:last-child {
+  border-bottom: 0;
+}
+
+.session-row h3,
+.session-row p {
+  margin: 0;
+}
+
+.session-row p {
+  margin-top: 5px;
+  color: #778079;
+  font-size: 12px;
+}
+
+.interview-room,
+.interview-report,
+.memory-card {
+  margin-top: 18px;
+  padding: 28px;
+  border: 1px solid #d5d6cf;
+  border-radius: 14px;
+  background: #faf9f5;
+}
+
+.question-meta,
+.room-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.question-meta {
+  color: #627168;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.interview-room h2 {
+  max-width: 900px;
+  margin: 22px 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.interview-room textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.room-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.answer-history {
+  margin-top: 24px;
+  border-top: 1px solid #dedfd9;
+  padding-top: 16px;
+}
+
+.answer-history summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.answer-history div {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f0f1eb;
+}
+
+.answer-history p {
+  margin: 6px 0 0;
+}
+
+.report-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.report-columns > div,
+.score-list article {
+  padding: 18px;
+  border-radius: 10px;
+  background: #f0f1eb;
+}
+
+.score-list {
+  display: grid;
+  gap: 12px;
+}
+
+.score-list article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.score-list h3,
+.score-list p {
+  margin: 5px 0;
+}
+
+.score-list article > div strong {
+  color: #315844;
+  font-family: Georgia, serif;
+  font-size: 30px;
+}
+
+.memory-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.memory-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f0f1eb;
+}
+
+.memory-list h3,
+.memory-list p {
+  margin: 3px 0;
+}
+
+.memory-list small {
+  color: #68736c;
+}
+
+.memory-score {
+  display: grid;
+  min-width: 62px;
+  text-align: center;
+}
+
+.memory-score strong {
+  color: #315844;
+  font-family: Georgia, serif;
+  font-size: 30px;
+}
+
+.memory-score span {
+  color: #68736c;
+  font-size: 11px;
+}
+
 .comparison-tags span {
   padding: 7px 10px;
   border-radius: 99px;
@@ -838,6 +1015,11 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .interview-grid,
+  .report-columns {
+    grid-template-columns: 1fr;
+  }
+
   .new-workspace {
     grid-column: span 2;
   }
@@ -870,6 +1052,16 @@ select:focus {
 
   .job-row .document-actions {
     grid-column: 2 / -1;
+  }
+
+  .session-row,
+  .memory-list article {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .session-row button,
+  .memory-list .document-actions {
+    grid-column: 2;
   }
 
   .document-row {

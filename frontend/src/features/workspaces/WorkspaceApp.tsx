@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
 import type { User, Workspace } from "../../types";
 import { DocumentsView } from "../documents/DocumentsView";
+import { InterviewsView } from "../interviews/InterviewsView";
 import { JobsView } from "../jobs/JobsView";
 
 export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => void }) {
@@ -12,7 +13,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
-  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs">("documents");
+  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews">("documents");
 
   const loadWorkspaces = useCallback(async () => {
     try {
@@ -88,8 +89,14 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
             onBack={() => setSelectedWorkspace(null)}
             onJobs={() => setWorkspaceView("jobs")}
           />
+        ) : workspaceView === "jobs" ? (
+          <JobsView
+            workspace={selectedWorkspace}
+            onBack={() => setWorkspaceView("documents")}
+            onInterviews={() => setWorkspaceView("interviews")}
+          />
         ) : (
-          <JobsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("documents")} />
+          <InterviewsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("jobs")} />
         )
       ) : <><section className="workspace-hero">
         <div>

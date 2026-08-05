@@ -116,3 +116,59 @@ export type CompetencyGap = {
   priority: number;
   job_count: number;
 };
+
+export type InterviewTurn = {
+  id: string;
+  competency_name: string;
+  sequence: number;
+  question: string;
+  answer: string | null;
+  is_follow_up: boolean;
+  answered_at: string | null;
+  created_at: string;
+};
+
+export type InterviewScore = {
+  id: string;
+  competency_name: string;
+  score: number;
+  rubric: string;
+  evidence: string[];
+  strengths: string[];
+  issues: string[];
+  suggestion: string;
+};
+
+export type Interview = {
+  id: string;
+  workspace_id: string;
+  job_description_id: string | null;
+  job_name: string | null;
+  interview_type: string;
+  question_limit: number;
+  status: string;
+  overall_score: number | null;
+  report_summary: string | null;
+  report_strengths: string[];
+  report_issues: string[];
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  turns: InterviewTurn[];
+  scores: InterviewScore[];
+};
+
+export type CompetencyMemory = {
+  id: string;
+  workspace_id: string;
+  source_session_id: string | null;
+  competency_name: string;
+  mastery_score: number;
+  confidence: number;
+  evidence_summary: string;
+  error_count: number;
+  confirmed: boolean;
+  updated_at: string;
+  created_at: string;
+};

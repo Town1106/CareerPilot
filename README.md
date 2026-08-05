@@ -11,7 +11,8 @@
 - 使用百炼 Qwen Embedding 与标准库 Sparse 表示将文档块写入本地 Qdrant，并支持失败重试。
 - 基于工作空间隔离的 Dense + Sparse + RRF 混合检索、证据问答和原文引用。
 - JD 结构化抽取、能力标准化、个人证据匹配、覆盖率、优先缺口和多岗位比较。
-- React 工作空间与知识库管理界面。
+- 基于岗位缺口的可恢复模拟面试、动态追问、独立评分报告和可管理能力记忆。
+- React 工作空间、知识库、岗位分析、模拟面试和能力记忆界面。
 
 ## 快速启动
 
@@ -87,6 +88,7 @@ API 文档：http://127.0.0.1:8000/docs
 - `backend/app/workspaces`：工作空间模型、校验和接口。
 - `backend/app/documents`：文档模型、解析、存储和接口。
 - `backend/app/jobs`：JD、能力、证据匹配、差距计算和多岗位比较。
+- `backend/app/interviews`：面试状态机、动态追问、评分报告和能力记忆。
 - `backend/app/rag`：百炼模型调用、Qdrant 索引、检索与引用问答。
-- `frontend/src/features`：按 auth、workspaces、documents 拆分的页面功能。
+- `frontend/src/features`：按 auth、workspaces、documents、jobs、interviews 拆分的页面功能。
 - `frontend/src/api.ts`、`types.ts`：共享请求逻辑与类型。

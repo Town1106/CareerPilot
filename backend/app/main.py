@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.core.config import FRONTEND_ORIGIN
 from app.documents.router import router as document_router
+from app.interviews.router import router as interview_router
 from app.jobs.router import router as job_router
 from app.rag.router import router as rag_router
 from app.rag.store import close_client
@@ -31,6 +32,7 @@ app.include_router(workspace_router)
 app.include_router(document_router)
 app.include_router(rag_router)
 app.include_router(job_router)
+app.include_router(interview_router)
 
 
 @app.get("/api/v1/health")
