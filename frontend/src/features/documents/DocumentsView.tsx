@@ -11,7 +11,7 @@ const STATUS_NAMES: Record<string, string> = {
   failed: "索引失败",
 };
 
-export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
+export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Workspace; onBack: () => void; onJobs: () => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState<Document["category"]>("resume");
@@ -171,6 +171,7 @@ export function DocumentsView({ workspace, onBack }: { workspace: Workspace; onB
           <p className="muted">上传简历和项目资料，为后续证据检索建立可靠来源。</p>
         </div>
         <div>
+          <button className="ghost" onClick={onJobs}>JD 差距分析</button>
           <button
             className="ghost"
             disabled={reindexing || documents.length === 0}

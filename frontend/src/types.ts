@@ -53,3 +53,66 @@ export type RagAnswer = {
   answer: string;
   citations: Citation[];
 };
+
+export type Job = {
+  id: string;
+  workspace_id: string;
+  company: string;
+  title: string;
+  raw_text: string;
+  status: string;
+  coverage_score: number | null;
+  analysis_error: string | null;
+  analyzed_at: string | null;
+  created_at: string;
+};
+
+export type JobEvidence = {
+  chunk_id: string | null;
+  document_id: string | null;
+  original_name: string | null;
+  page_number: number | null;
+  content: string | null;
+  score: number;
+  support_level: string;
+  explanation: string;
+};
+
+export type JobRequirement = {
+  id: string;
+  competency: string;
+  category: string;
+  requirement_type: string;
+  importance: number;
+  raw_evidence: string;
+  coverage: string;
+  confidence: number;
+  explanation: string;
+  priority: number;
+  evidence: JobEvidence[];
+};
+
+export type JobAnalysis = {
+  job: Job;
+  requirements: JobRequirement[];
+};
+
+export type JobComparisonItem = {
+  competency: string;
+  jobs: Record<string, string>;
+};
+
+export type JobComparison = {
+  jobs: Job[];
+  common: JobComparisonItem[];
+  differences: JobComparisonItem[];
+};
+
+export type CompetencyGap = {
+  competency: string;
+  category: string;
+  worst_coverage: string;
+  max_importance: number;
+  priority: number;
+  job_count: number;
+};

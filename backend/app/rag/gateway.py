@@ -1,3 +1,5 @@
+import json
+
 import httpx
 
 from app.core.config import (
@@ -104,3 +106,33 @@ async def answer_with_context(question: str, sources: list[str]) -> str:
     if not answer:
         raise AIServiceError("百炼返回了空答案")
     return answer
+
+
+async def structured_chat(system: str, prompt: str) -> dict:
+    if not DASHSCOPE_API_KEY:
+        raise AIServiceError("未配置 DASHSCOPE_API_KEY")
+    async with httpx.AsyncClient(
+        base_url=DASHSCOPE_BASE_URL,
+        headers={"Authorization": f"Bearer {DASHSCOPE_API_KEY}"},
+        timeout=90,
+    ) as client:
+        body = await _post(
+            client,
+            "/chat/completions",
+            {
+                "model": DASHSCOPE_CHAT_MODEL,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "response_format": {"type": "json_object"},
+                "enable_thinking": False,
+                "temperature": 0,
+                "max_tokens": 4000,
+            },
+        )
+    try:
+        content = body["choices"][0]["message"]["content"].strip()
+        return json.loads(content)
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
+        raise AIServiceError("百炼返回了无效的结构化响应") from error

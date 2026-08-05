@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
 import type { User, Workspace } from "../../types";
 import { DocumentsView } from "../documents/DocumentsView";
+import { JobsView } from "../jobs/JobsView";
 
 export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -11,6 +12,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
+  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs">("documents");
 
   const loadWorkspaces = useCallback(async () => {
     try {
@@ -80,7 +82,15 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
       </header>
 
       {selectedWorkspace ? (
-        <DocumentsView workspace={selectedWorkspace} onBack={() => setSelectedWorkspace(null)} />
+        workspaceView === "documents" ? (
+          <DocumentsView
+            workspace={selectedWorkspace}
+            onBack={() => setSelectedWorkspace(null)}
+            onJobs={() => setWorkspaceView("jobs")}
+          />
+        ) : (
+          <JobsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("documents")} />
+        )
       ) : <><section className="workspace-hero">
         <div>
           <p className="eyebrow">YOUR WORKSPACES</p>
@@ -134,7 +144,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
                 创建于 {new Date(workspace.created_at).toLocaleDateString("zh-CN")}
               </p>
               <div className="card-actions">
-                <button className="primary" onClick={() => setSelectedWorkspace(workspace)}>打开知识库</button>
+                <button className="primary" onClick={() => { setSelectedWorkspace(workspace); setWorkspaceView("documents"); }}>打开知识库</button>
                 <button className="ghost" onClick={() => renameWorkspace(workspace)}>重命名</button>
                 <button className="danger" onClick={() => removeWorkspace(workspace)}>删除</button>
               </div>

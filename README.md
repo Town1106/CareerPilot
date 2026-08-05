@@ -10,6 +10,7 @@
 - PDF、DOCX、TXT、Markdown 文档上传、SHA-256 去重、版本管理、切块和删除。
 - 使用百炼 Qwen Embedding 与标准库 Sparse 表示将文档块写入本地 Qdrant，并支持失败重试。
 - 基于工作空间隔离的 Dense + Sparse + RRF 混合检索、证据问答和原文引用。
+- JD 结构化抽取、能力标准化、个人证据匹配、覆盖率、优先缺口和多岗位比较。
 - React 工作空间与知识库管理界面。
 
 ## 快速启动
@@ -85,6 +86,7 @@ API 文档：http://127.0.0.1:8000/docs
 - `backend/app/auth`：账户、Session 与鉴权依赖。
 - `backend/app/workspaces`：工作空间模型、校验和接口。
 - `backend/app/documents`：文档模型、解析、存储和接口。
+- `backend/app/jobs`：JD、能力、证据匹配、差距计算和多岗位比较。
 - `backend/app/rag`：百炼模型调用、Qdrant 索引、检索与引用问答。
 - `frontend/src/features`：按 auth、workspaces、documents 拆分的页面功能。
 - `frontend/src/api.ts`、`types.ts`：共享请求逻辑与类型。
