@@ -68,3 +68,33 @@ class EvidenceLink(Base):
     score: Mapped[float] = mapped_column(Float)
     support_level: Mapped[str] = mapped_column(String(20))
     explanation: Mapped[str] = mapped_column(Text)
+
+
+class InterviewResearch(Base):
+    __tablename__ = "interview_research"
+    __table_args__ = (UniqueConstraint("job_description_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    job_description_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_descriptions.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ResearchQuestion(Base):
+    __tablename__ = "research_questions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    research_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("interview_research.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(Text)
+    competency: Mapped[str] = mapped_column(String(120))
+    interview_stage: Mapped[str] = mapped_column(String(30))
+    source_url: Mapped[str] = mapped_column(Text)
+    source_title: Mapped[str] = mapped_column(String(500))
+    excerpt: Mapped[str] = mapped_column(Text)

@@ -26,6 +26,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
   const [jobId, setJobId] = useState("");
   const [interviewType, setInterviewType] = useState("mixed");
   const [questionLimit, setQuestionLimit] = useState(10);
+  const [useWebResearch, setUseWebResearch] = useState(true);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +68,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
           job_description_id: jobId,
           interview_type: interviewType,
           question_limit: questionLimit,
+          use_web_research: useWebResearch,
         }),
       });
       replaceSession(await api<Interview>(`${base}/interviews/${created.id}/start`, {
@@ -193,6 +195,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
         <label>目标岗位<select required value={jobId} onChange={(event) => setJobId(event.target.value)}><option value="">请选择已分析岗位</option>{jobs.map((job) => <option key={job.id} value={job.id}>{job.company} · {job.title}</option>)}</select></label>
         <label>面试方向<select value={interviewType} onChange={(event) => setInterviewType(event.target.value)}>{Object.entries(TYPE_NAMES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>题目数量<input type="number" min={3} max={15} value={questionLimit} onChange={(event) => setQuestionLimit(Number(event.target.value))} /></label>
+        <label className="check-label"><input type="checkbox" checked={useWebResearch} onChange={(event) => setUseWebResearch(event.target.checked)} />使用已搜索的公司面经题库</label>
         <button className="primary" disabled={busy || !jobId}>{busy ? "正在准备…" : "开始模拟面试"}</button>
         {jobs.length === 0 && <p className="muted">请先在岗位分析页完成至少一个 JD 分析。</p>}
       </form>
@@ -207,10 +210,11 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
     </div>
 
     {current?.status === "in_progress" && pendingTurn && <section className="interview-room">
-      <div className="question-meta"><span>第 {pendingTurn.sequence} / {current.question_limit} 题</span><span>{pendingTurn.competency_name}{pendingTurn.is_follow_up ? " · 追问" : ""}</span></div>
+      <div className="question-meta"><span>第 {pendingTurn.sequence} / {current.question_limit} 题</span><span>{pendingTurn.source_type === "company_research" ? "公司面经" : "岗位能力缺口"} · {pendingTurn.competency_name}{pendingTurn.is_follow_up ? " · 追问" : ""}</span></div>
       <h2>{pendingTurn.question}</h2>
+      {pendingTurn.source_url && <a className="question-source" href={pendingTurn.source_url} target="_blank" rel="noreferrer">查看面经来源 ↗</a>}
       <form onSubmit={submitAnswer}><textarea required minLength={1} maxLength={5000} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="像真实面试一样作答，建议说明原理、场景和取舍。" /><div className="room-actions"><button className="primary" disabled={busy}>{busy ? "面试官思考中…" : "提交回答"}</button><button type="button" className="ghost" disabled={busy || !current.turns.some((turn) => turn.answer)} onClick={() => void finish()}>提前结束</button></div></form>
-      <details className="answer-history"><summary>查看已回答内容</summary>{current.turns.filter((turn) => turn.answer).map((turn) => <div key={turn.id}><strong>Q{turn.sequence} · {turn.competency_name}</strong><p>{turn.question}</p><p className="muted">{turn.answer}</p></div>)}</details>
+      <details className="answer-history"><summary>查看已回答内容</summary>{current.turns.filter((turn) => turn.answer).map((turn) => <div key={turn.id}><strong>Q{turn.sequence} · {turn.source_type === "company_research" ? "公司面经" : "岗位缺口"} · {turn.competency_name}</strong><p>{turn.question}</p><p className="muted">{turn.answer}</p></div>)}</details>
     </section>}
 
     {current?.status === "completed" && <section className="interview-report"><div className="analysis-heading"><div><p className="eyebrow">INTERVIEW REPORT</p><h2>{current.job_name}</h2></div><strong>{current.overall_score} 分</strong></div><p>{current.report_summary}</p>

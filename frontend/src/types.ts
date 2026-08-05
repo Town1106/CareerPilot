@@ -117,9 +117,32 @@ export type CompetencyGap = {
   job_count: number;
 };
 
+export type ResearchQuestion = {
+  id: string;
+  question: string;
+  competency: string;
+  interview_stage: string;
+  source_url: string;
+  source_title: string;
+  excerpt: string;
+};
+
+export type JobResearch = {
+  job_description_id: string;
+  status: string;
+  error: string | null;
+  searched_at: string | null;
+  expires_at: string | null;
+  source_count: number;
+  questions: ResearchQuestion[];
+};
+
 export type InterviewTurn = {
   id: string;
   competency_name: string;
+  research_question_id: string | null;
+  source_type: string;
+  source_url: string | null;
   sequence: number;
   question: string;
   answer: string | null;
@@ -146,6 +169,7 @@ export type Interview = {
   job_name: string | null;
   interview_type: string;
   question_limit: number;
+  use_web_research: boolean;
   status: string;
   overall_score: number | null;
   report_summary: string | null;

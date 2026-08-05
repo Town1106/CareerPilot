@@ -20,7 +20,13 @@ from app.interviews.schemas import (
     ScoreOut,
     TurnOut,
 )
-from app.jobs.models import Competency, JobDescription, JobRequirement
+from app.jobs.models import (
+    Competency,
+    InterviewResearch,
+    JobDescription,
+    JobRequirement,
+    ResearchQuestion,
+)
 from app.jobs.service import normalize_competency
 from app.rag import gateway
 from app.rag.gateway import AIServiceError
@@ -76,6 +82,55 @@ async def generate_question(
         return QuestionResult.model_validate(payload).question
     except ValidationError as error:
         raise AIServiceError("面试问题未通过结构校验") from error
+
+
+async def next_turn(
+    db: AsyncSession,
+    session: InterviewSession,
+    rows: list[tuple[JobRequirement, Competency]],
+    turns: list[InterviewTurn],
+) -> InterviewTurn:
+    research_count = sum(turn.source_type == "company_research" for turn in turns)
+    gap_count = len(turns) - research_count
+    if session.use_web_research and research_count <= gap_count:
+        used_ids = [turn.research_question_id for turn in turns if turn.research_question_id]
+        query = (
+            select(ResearchQuestion)
+            .join(InterviewResearch, InterviewResearch.id == ResearchQuestion.research_id)
+            .where(InterviewResearch.job_description_id == session.job_description_id)
+            .order_by(ResearchQuestion.interview_stage, ResearchQuestion.id)
+        )
+        if session.interview_type != "mixed":
+            query = query.where(ResearchQuestion.interview_stage == session.interview_type)
+        if used_ids:
+            query = query.where(ResearchQuestion.id.not_in(used_ids))
+        research_question = await db.scalar(query.limit(1))
+        if research_question:
+            return InterviewTurn(
+                session_id=session.id,
+                research_question_id=research_question.id,
+                competency_name=normalize_competency(research_question.competency),
+                sequence=len(turns) + 1,
+                question=research_question.question,
+                source_type="company_research",
+                source_url=research_question.source_url,
+            )
+
+    counts = Counter(turn.competency_name for turn in turns)
+    requirement, competency = min(rows, key=lambda row: counts[row[1].canonical_name])
+    question = await generate_question(
+        requirement,
+        competency,
+        session.interview_type,
+        [turn.question for turn in turns],
+    )
+    return InterviewTurn(
+        session_id=session.id,
+        competency_id=competency.id,
+        competency_name=competency.canonical_name,
+        sequence=len(turns) + 1,
+        question=question,
+    )
 
 
 async def assess_answer(turn: InterviewTurn, answer: str) -> AnswerAssessment:
@@ -166,6 +221,7 @@ async def get_interview(db: AsyncSession, session: InterviewSession) -> Intervie
         job_name=f"{job.company} · {job.title}" if job else None,
         interview_type=session.interview_type,
         question_limit=session.question_limit,
+        use_web_research=session.use_web_research,
         status=session.status,
         overall_score=session.overall_score,
         report_summary=session.report_summary,
@@ -200,17 +256,7 @@ async def start_interview(db: AsyncSession, session: InterviewSession) -> Interv
     rows = await requirement_rows(db, session)
     if not rows:
         raise InterviewStateError("目标岗位尚未完成能力分析")
-    requirement, competency = rows[0]
-    question = await generate_question(requirement, competency, session.interview_type, [])
-    db.add(
-        InterviewTurn(
-            session_id=session.id,
-            competency_id=competency.id,
-            competency_name=competency.canonical_name,
-            sequence=1,
-            question=question,
-        )
-    )
+    db.add(await next_turn(db, session, rows, []))
     session.status = "in_progress"
     session.started_at = utc_now()
     session.error = None
@@ -327,32 +373,16 @@ async def submit_answer(db: AsyncSession, session: InterviewSession, answer: str
                 session_id=session.id,
                 competency_id=current.competency_id,
                 competency_name=current.competency_name,
+                research_question_id=current.research_question_id,
                 sequence=len(turns) + 1,
                 question=assessment.follow_up_question,
                 is_follow_up=True,
+                source_type=current.source_type,
+                source_url=current.source_url,
             )
         )
     else:
         rows = await requirement_rows(db, session)
-        counts = Counter(turn.competency_name for turn in turns)
-        requirement, competency = min(
-            rows,
-            key=lambda row: counts[row[1].canonical_name],
-        )
-        question = await generate_question(
-            requirement,
-            competency,
-            session.interview_type,
-            [turn.question for turn in turns],
-        )
-        db.add(
-            InterviewTurn(
-                session_id=session.id,
-                competency_id=competency.id,
-                competency_name=competency.canonical_name,
-                sequence=len(turns) + 1,
-                question=question,
-            )
-        )
+        db.add(await next_turn(db, session, rows, turns))
     await db.commit()
     return await get_interview(db, session)

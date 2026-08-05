@@ -11,6 +11,7 @@ class InterviewCreate(BaseModel):
     job_description_id: uuid.UUID
     interview_type: InterviewType = "mixed"
     question_limit: int = Field(default=10, ge=3, le=15)
+    use_web_research: bool = True
 
 
 class QuestionResult(BaseModel):
@@ -72,6 +73,9 @@ class TurnOut(BaseModel):
 
     id: uuid.UUID
     competency_name: str
+    research_question_id: uuid.UUID | None
+    source_type: str
+    source_url: str | None
     sequence: int
     question: str
     answer: str | None
@@ -98,6 +102,7 @@ class InterviewOut(BaseModel):
     job_name: str | None
     interview_type: str
     question_limit: int
+    use_web_research: bool
     status: str
     overall_score: float | None
     report_summary: str | None

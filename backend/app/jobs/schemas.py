@@ -106,3 +106,38 @@ class GapOut(BaseModel):
     max_importance: int
     priority: float
     job_count: int
+
+
+class ExtractedResearchQuestion(BaseModel):
+    question: str = Field(min_length=5, max_length=1000)
+    competency: str = Field(min_length=1, max_length=120)
+    interview_stage: Literal["technical", "project", "system_design", "behavioral"]
+    source_url: str = Field(min_length=8, max_length=2000)
+    source_title: str = Field(min_length=1, max_length=500)
+    excerpt: str = Field(min_length=1, max_length=1000)
+
+
+class ResearchExtraction(BaseModel):
+    questions: list[ExtractedResearchQuestion] = Field(min_length=1, max_length=30)
+
+
+class ResearchQuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    question: str
+    competency: str
+    interview_stage: str
+    source_url: str
+    source_title: str
+    excerpt: str
+
+
+class JobResearchOut(BaseModel):
+    job_description_id: uuid.UUID
+    status: str
+    error: str | None
+    searched_at: datetime | None
+    expires_at: datetime | None
+    source_count: int
+    questions: list[ResearchQuestionOut]

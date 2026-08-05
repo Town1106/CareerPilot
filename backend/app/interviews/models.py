@@ -29,6 +29,7 @@ class InterviewSession(Base):
     )
     interview_type: Mapped[str] = mapped_column(String(30))
     question_limit: Mapped[int] = mapped_column(Integer)
+    use_web_research: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     status: Mapped[str] = mapped_column(String(20), default="draft")
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     report_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -52,6 +53,13 @@ class InterviewTurn(Base):
         ForeignKey("competencies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     competency_name: Mapped[str] = mapped_column(String(120))
+    research_question_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("research_questions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_type: Mapped[str] = mapped_column(
+        String(30), default="job_gap", server_default="job_gap"
+    )
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     sequence: Mapped[int] = mapped_column(Integer)
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
