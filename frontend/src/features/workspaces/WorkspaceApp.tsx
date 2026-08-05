@@ -5,6 +5,7 @@ import type { User, Workspace } from "../../types";
 import { DocumentsView } from "../documents/DocumentsView";
 import { InterviewsView } from "../interviews/InterviewsView";
 import { JobsView } from "../jobs/JobsView";
+import { PlansView } from "../plans/PlansView";
 
 export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -13,7 +14,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
-  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews">("documents");
+  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews" | "plans">("documents");
 
   const loadWorkspaces = useCallback(async () => {
     try {
@@ -95,8 +96,14 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
             onBack={() => setWorkspaceView("documents")}
             onInterviews={() => setWorkspaceView("interviews")}
           />
+        ) : workspaceView === "interviews" ? (
+          <InterviewsView
+            workspace={selectedWorkspace}
+            onBack={() => setWorkspaceView("jobs")}
+            onPlans={() => setWorkspaceView("plans")}
+          />
         ) : (
-          <InterviewsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("jobs")} />
+          <PlansView workspace={selectedWorkspace} onBack={() => setWorkspaceView("interviews")} />
         )
       ) : <><section className="workspace-hero">
         <div>

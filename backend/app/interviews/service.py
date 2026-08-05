@@ -29,6 +29,7 @@ from app.jobs.models import (
 )
 from app.jobs.research import search_company_questions
 from app.jobs.service import normalize_competency
+from app.plans.service import adjust_priorities_after_interview
 from app.rag import gateway
 from app.rag.gateway import AIServiceError
 
@@ -385,6 +386,7 @@ async def finalize_interview(db: AsyncSession, session: InterviewSession) -> Int
                 )
             )
     await db.commit()
+    await adjust_priorities_after_interview(db, session.workspace_id)
     return await get_interview(db, session)
 
 

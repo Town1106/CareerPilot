@@ -11,6 +11,7 @@ from app.core.database import Base
 from app.documents import models as document_models  # noqa: F401
 from app.interviews import models as interview_models  # noqa: F401
 from app.jobs import models as job_models  # noqa: F401
+from app.plans import models as plan_models  # noqa: F401
 from app.workspaces import models as workspace_models  # noqa: F401
 
 config = context.config

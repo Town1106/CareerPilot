@@ -17,7 +17,7 @@ const STATUS_NAMES: Record<string, string> = {
   completed: "已完成",
 };
 
-export function InterviewsView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
+export function InterviewsView({ workspace, onBack, onPlans }: { workspace: Workspace; onBack: () => void; onPlans: () => void }) {
   const base = `/api/v1/workspaces/${workspace.id}`;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sessions, setSessions] = useState<Interview[]>([]);
@@ -187,6 +187,7 @@ export function InterviewsView({ workspace, onBack }: { workspace: Workspace; on
     <button className="text-button back-button" onClick={onBack}>← 返回岗位分析</button>
     <div className="knowledge-header">
       <div><p className="eyebrow">ADAPTIVE INTERVIEW · {workspace.target_role || "目标岗位"}</p><h1>模拟面试与能力记忆</h1><p className="muted">根据岗位缺口动态追问，结束后统一评分。</p></div>
+      <button className="primary" onClick={onPlans}>查看学习计划 →</button>
     </div>
 
     <div className="interview-grid">

@@ -176,3 +176,30 @@ export type CompetencyMemory = {
   updated_at: string;
   created_at: string;
 };
+
+export type StudyTask = {
+  id: string;
+  competency_name: string | null;
+  title: string;
+  description: string;
+  scheduled_date: string;
+  duration_minutes: number;
+  priority: number;
+  status: string;
+  created_at: string;
+};
+
+export type StudyPlan = {
+  id: string;
+  workspace_id: string;
+  goal: string;
+  start_date: string;
+  end_date: string;
+  version: number;
+  status: string;
+  created_at: string;
+  tasks: StudyTask[];
+  total_tasks: number;
+  completed_tasks: number;
+  coverage: number;
+};
