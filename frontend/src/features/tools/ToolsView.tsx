@@ -10,7 +10,7 @@ const RISK_LABELS: Record<string, string> = {
   R3: "高风险",
 };
 
-export function ToolsView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
+export function ToolsView({ workspace, onBack, onGitHub }: { workspace: Workspace; onBack: () => void; onGitHub?: () => void }) {
   const [tools, setTools] = useState<ToolItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,6 +91,7 @@ export function ToolsView({ workspace, onBack }: { workspace: Workspace; onBack:
         <div style={{ display: "flex", gap: 8 }}>
           <button className="ghost" onClick={loadApprovals}>刷新审批</button>
           <button className="ghost" onClick={loadTools}>刷新</button>
+          {onGitHub && <button className="ghost" onClick={onGitHub}>GitHub →</button>}
         </div>
       </header>
 

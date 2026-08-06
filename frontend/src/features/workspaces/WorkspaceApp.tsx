@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
 import type { User, Workspace } from "../../types";
 import { DocumentsView } from "../documents/DocumentsView";
+import { GitHubView } from "../github/GitHubView";
 import { InterviewsView } from "../interviews/InterviewsView";
 import { JobsView } from "../jobs/JobsView";
 import { PlansView } from "../plans/PlansView";
@@ -17,7 +18,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
-  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews" | "plans" | "traces" | "skills" | "tools">("documents");
+  const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews" | "plans" | "traces" | "skills" | "tools" | "github">("documents");
 
   const loadWorkspaces = useCallback(async () => {
     try {
@@ -111,8 +112,10 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
           <TracesView workspace={selectedWorkspace} onBack={() => setWorkspaceView("plans")} />
         ) : workspaceView === "skills" ? (
           <SkillsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("traces")} onTools={() => setWorkspaceView("tools")} />
+        ) : workspaceView === "tools" ? (
+          <ToolsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("skills")} onGitHub={() => setWorkspaceView("github")} />
         ) : (
-          <ToolsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("skills")} />
+          <GitHubView workspace={selectedWorkspace} onBack={() => setWorkspaceView("tools")} />
         )
       ) : <><section className="workspace-hero">
         <div>

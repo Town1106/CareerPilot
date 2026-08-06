@@ -291,3 +291,33 @@ export type ApprovalItem = {
   created_at: string;
   decided_at: string | null;
 };
+
+export type MCPStatus = {
+  provider: string;
+  connected: boolean;
+  message: string;
+};
+
+export type RepoSummary = {
+  name: string;
+  full_name: string;
+  description: string | null;
+  language: string | null;
+  stargazers_count: number;
+  updated_at: string;
+  html_url: string;
+};
+
+export type RepoDetail = RepoSummary & {
+  topics: string[];
+  default_branch: string;
+  open_issues_count: number;
+  created_at: string;
+};
+
+export type CommitItem = {
+  sha: string;
+  message: string;
+  author: string;
+  date: string;
+};

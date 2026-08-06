@@ -10,6 +10,7 @@ from app.core.database import SessionFactory
 from app.documents.router import router as document_router
 from app.interviews.router import router as interview_router
 from app.jobs.router import router as job_router
+from app.mcp.router import router as mcp_router
 from app.plans.router import router as plan_router
 from app.rag.router import router as rag_router
 from app.rag.store import close_client
@@ -53,6 +54,7 @@ app.include_router(workspace_router)
 app.include_router(document_router)
 app.include_router(rag_router)
 app.include_router(job_router)
+app.include_router(mcp_router)
 app.include_router(interview_router)
 app.include_router(plan_router)
 app.include_router(skills_router)

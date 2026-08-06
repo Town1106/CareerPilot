@@ -36,6 +36,7 @@ line-length = 100
 "app/documents/*.py" = ["B008"]
 "app/interviews/*.py" = ["B008"]
 "app/jobs/*.py" = ["B008"]
+"app/mcp/*.py" = ["B008"]
 "app/plans/*.py" = ["B008"]
 "app/rag/*.py" = ["B008"]
 "app/skills/*.py" = ["B008"]
