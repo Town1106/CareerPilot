@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../../api";
-import type { CommitItem, RepoDetail, RepoSummary, Workspace } from "../../types";
+import type { CommitItem, ConsistencyReport, FactItem, RepoDetail, RepoSummary, Workspace } from "../../types";
 
 export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
   const [connected, setConnected] = useState(false);
@@ -14,6 +14,11 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
   const [readme, setReadme] = useState("");
   const [commits, setCommits] = useState<CommitItem[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const [fact, setFact] = useState<FactItem | null>(null);
+  const [report, setReport] = useState<ConsistencyReport | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   async function connect() {
     setLoading(true);
@@ -69,6 +74,8 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
     setSelectedRepo(null);
     setReadme("");
     setCommits([]);
+    setFact(null);
+    setReport(null);
     try {
       const [detail, readmeData, commitsData] = await Promise.all([
         api<RepoDetail>(`/api/v1/mcp/github/repos/${owner}/${repoName}`),
@@ -85,10 +92,46 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
     }
   }
 
+  async function doExtract() {
+    if (!selectedRepo) return;
+    setAnalyzing(true);
+    setError("");
+    try {
+      const data = await api<FactItem>("/api/v1/analysis/extract-facts", {
+        method: "POST",
+        body: JSON.stringify({ repo_full_name: selectedRepo.full_name }),
+      });
+      setFact(data);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "分析失败");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function doCheck() {
+    if (!selectedRepo) return;
+    setChecking(true);
+    setError("");
+    try {
+      const data = await api<ConsistencyReport>("/api/v1/analysis/check-consistency", {
+        method: "POST",
+        body: JSON.stringify({ repo_full_name: selectedRepo.full_name }),
+      });
+      setReport(data);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "校验失败");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   useEffect(() => {
     setSelectedRepo(null);
     setRepos([]);
     setConnected(false);
+    setFact(null);
+    setReport(null);
   }, [workspace.id]);
 
   return (
@@ -122,7 +165,7 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
         </div>
       ) : selectedRepo ? (
         <div>
-          <button className="ghost" onClick={() => setSelectedRepo(null)} style={{ marginBottom: 12 }}>
+          <button className="ghost" onClick={() => { setSelectedRepo(null); setFact(null); setReport(null); }} style={{ marginBottom: 12 }}>
             ← 返回仓库列表
           </button>
           <div className="trace-card completed">
@@ -141,7 +184,102 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
                   ))}
                 </div>
               )}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button className="ghost" onClick={doExtract} disabled={analyzing}>
+                  {analyzing ? "分析中…" : "🔍 提取项目事实"}
+                </button>
+                {fact && (
+                  <button className="ghost" onClick={doCheck} disabled={checking}>
+                    {checking ? "校验中…" : "✓ 简历一致性校验"}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {fact && (
+              <div className="trace-detail" style={{ background: "#f5f8f4" }}>
+                <h4 style={{ margin: "0 0 8px" }}>项目事实提取</h4>
+                <div className="trace-meta">
+                  <span>角色：{fact.extracted_role || "N/A"}</span>
+                </div>
+                <p style={{ fontSize: 13, margin: "4px 0 8px" }}>{fact.extracted_summary}</p>
+                {fact.extracted_tech_stack && fact.extracted_tech_stack.length > 0 && (
+                  <div style={{ marginBottom: 4 }}>
+                    {fact.extracted_tech_stack.map((t: string) => (
+                      <span key={t} className="skill-tag">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {report && (
+              <div className="trace-detail">
+                <h4 style={{ margin: "0 0 8px" }}>
+                  简历一致性报告 — 评分：{report.overall_score}/100
+                </h4>
+                <div style={{ marginBottom: 8, background: "#e8ede7", borderRadius: 8, height: 8, overflow: "hidden" }}>
+                  <div style={{
+                    width: `${report.overall_score}%`,
+                    height: "100%",
+                    background: report.overall_score >= 70 ? "var(--accent)" : report.overall_score >= 40 ? "#f0c040" : "#d14b4b",
+                    borderRadius: 8,
+                  }} />
+                </div>
+
+                {report.matched_items && report.matched_items.length > 0 && (
+                  <div className="trace-step" style={{ borderLeft: "3px solid #2a7d4f" }}>
+                    <div className="trace-step-header">
+                      <span className="trace-step-name">✓ 匹配项 ({report.matched_items.length})</span>
+                    </div>
+                    <div className="trace-step-body">
+                      {report.matched_items.map((m, i) => (
+                        <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                          <span style={{ color: "#2a7d4f" }}>{m.item}</span>
+                          <span className="muted" style={{ marginLeft: 8 }}>— {m.source}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {report.missing_in_resume && report.missing_in_resume.length > 0 && (
+                  <div className="trace-step" style={{ borderLeft: "3px solid #f0c040" }}>
+                    <div className="trace-step-header">
+                      <span className="trace-step-name">⚠ 缺失项 ({report.missing_in_resume.length})</span>
+                    </div>
+                    <div className="trace-step-body">
+                      {report.missing_in_resume.map((m, i) => (
+                        <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                          <span style={{ color: "#9e7700" }}>{m.item}</span>
+                          <span className="muted" style={{ marginLeft: 8 }}>— {m.evidence}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {report.conflicts && report.conflicts.length > 0 && (
+                  <div className="trace-step" style={{ borderLeft: "3px solid #d14b4b" }}>
+                    <div className="trace-step-header">
+                      <span className="trace-step-name">✗ 矛盾项 ({report.conflicts.length})</span>
+                    </div>
+                    <div className="trace-step-body">
+                      {report.conflicts.map((c, i) => (
+                        <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                          <span style={{ color: "#9c3e36" }}>简历声称：{c.claim}</span>
+                          <br />
+                          <span className="muted">GitHub 实际：{c.reality}</span>
+                          <span className="trace-badge" style={{ marginLeft: 8, fontSize: 11 }}>
+                            {c.severity}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {readme && (
               <div className="trace-detail" style={{ maxHeight: 400, overflow: "auto" }}>

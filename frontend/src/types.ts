@@ -321,3 +321,25 @@ export type CommitItem = {
   author: string;
   date: string;
 };
+
+export type FactItem = {
+  id: string;
+  workspace_id: string;
+  repo_full_name: string;
+  extracted_tech_stack: string[] | null;
+  extracted_summary: string | null;
+  extracted_role: string | null;
+  commit_count: number;
+  created_at: string;
+};
+
+export type ConsistencyReport = {
+  id: string;
+  workspace_id: string;
+  repo_full_name: string;
+  matched_items: { item: string; source: string }[] | null;
+  missing_in_resume: { item: string; evidence: string }[] | null;
+  conflicts: { claim: string; reality: string; severity: string }[] | null;
+  overall_score: number;
+  created_at: string;
+};

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.analysis.router import router as analysis_router
 from app.auth.router import router as auth_router
 from app.core.config import FRONTEND_ORIGIN
 from app.core.database import SessionFactory
@@ -49,6 +50,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(analysis_router)
 app.include_router(auth_router)
 app.include_router(workspace_router)
 app.include_router(document_router)
