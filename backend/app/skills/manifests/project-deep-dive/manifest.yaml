@@ -1,0 +1,13 @@
+name: project-deep-dive
+version: 1.0.0
+description: 基于项目资料进行深度技术追问
+triggers:
+  - 项目深挖
+  - 聊聊你的项目
+  - 这个项目你怎么做的
+required_inputs:
+  - workspace_id
+  - project_document_ids
+allowed_tools:
+  - rag.search
+risk_level: R0

@@ -1,0 +1,11 @@
+name: rag-generate-answer
+version: 1.0.0
+description: 基于检索到的文档片段生成回答
+risk_level: R0
+input_schema:
+  query: string
+  chunks: array
+  workspace_id: uuid
+output_schema:
+  answer: string
+  citations: array

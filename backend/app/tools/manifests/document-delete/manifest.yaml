@@ -1,0 +1,9 @@
+name: document-delete
+version: 1.0.0
+description: 从知识库中删除文档
+risk_level: R3
+input_schema:
+  workspace_id: uuid
+  document_id: uuid
+output_schema:
+  success: boolean

@@ -14,6 +14,7 @@ dependencies = [
     "pypdf>=6,<7",
     "python-multipart>=0.0.20,<1",
     "pywin32>=311; sys_platform == 'win32'",
+    "pyyaml>=6.0.3",
     "qdrant-client>=1.15,<2",
     "sqlalchemy[asyncio]>=2.0,<3",
     "uvicorn>=0.35,<1",
@@ -37,5 +38,7 @@ line-length = 100
 "app/jobs/*.py" = ["B008"]
 "app/plans/*.py" = ["B008"]
 "app/rag/*.py" = ["B008"]
+"app/skills/*.py" = ["B008"]
+"app/tools/*.py" = ["B008"]
 "app/traces/*.py" = ["B008"]
 "app/workspaces/*.py" = ["B008"]

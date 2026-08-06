@@ -1,0 +1,8 @@
+name: memory-read-profile
+version: 1.0.0
+description: 读取用户的面试能力画像
+risk_level: R0
+input_schema:
+  workspace_id: uuid
+output_schema:
+  competencies: array

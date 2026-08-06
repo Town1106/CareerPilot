@@ -1,0 +1,11 @@
+name: memory-write-competency
+version: 1.0.0
+description: 写入或更新面试能力评分数据
+risk_level: R1
+input_schema:
+  workspace_id: uuid
+  competency_name: string
+  score: integer
+  evidence: string
+output_schema:
+  success: boolean

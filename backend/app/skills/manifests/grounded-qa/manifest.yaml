@@ -1,0 +1,15 @@
+name: grounded-qa
+version: 1.0.0
+description: 基于上传资料回答并生成引用
+triggers:
+  - 分析这个文档
+  - 简历里提到了什么
+  - 这个项目用了什么技术
+  - 根据资料回答
+required_inputs:
+  - workspace_id
+  - query
+allowed_tools:
+  - rag.search
+  - rag.generate_answer
+risk_level: R0

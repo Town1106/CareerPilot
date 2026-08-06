@@ -1,0 +1,15 @@
+name: jd-gap-analysis
+version: 1.0.0
+description: 分析岗位要求与用户证据之间的差距
+triggers:
+  - 分析这个岗位
+  - 对比简历和JD
+  - 我还缺少哪些能力
+  - 岗位差距分析
+required_inputs:
+  - job_description_id
+  - workspace_id
+allowed_tools:
+  - rag.search
+  - rag.generate_answer
+risk_level: R0

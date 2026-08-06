@@ -1,0 +1,16 @@
+name: study-plan
+version: 1.0.0
+description: 根据能力差距和时间预算生成学习计划
+triggers:
+  - 生成学习计划
+  - 安排复习计划
+  - 备战面试计划
+required_inputs:
+  - workspace_id
+  - start_date
+  - end_date
+  - daily_minutes
+allowed_tools:
+  - rag.search
+  - memory.read_competency_profile
+risk_level: R0

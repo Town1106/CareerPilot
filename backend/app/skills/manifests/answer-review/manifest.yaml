@@ -1,0 +1,13 @@
+name: answer-review
+version: 1.0.0
+description: 对单次面试回答进行结构化评分
+triggers:
+  - 评价我的回答
+  - 这道题答得怎么样
+required_inputs:
+  - question
+  - answer
+  - competency_name
+allowed_tools:
+  - memory.write_competency
+risk_level: R0

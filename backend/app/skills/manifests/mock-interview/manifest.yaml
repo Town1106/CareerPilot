@@ -1,0 +1,16 @@
+name: mock-interview
+version: 1.0.0
+description: 自适应模拟面试，根据回答动态追问
+triggers:
+  - 开始模拟面试
+  - 面试练习
+  - 技术面试
+  - 行为面试
+required_inputs:
+  - workspace_id
+  - job_description_id
+  - interview_type
+allowed_tools:
+  - rag.search
+  - memory.read_competency_profile
+risk_level: R0

@@ -1554,3 +1554,15 @@ button.small {
   color: #9c3e36;
   font-size: 0.82rem;
 }
+
+/* ---------- Skills ---------- */
+.skill-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 2px 4px 2px 0;
+  border-radius: 99px;
+  background: #e8ede7;
+  color: #315844;
+  font-size: 0.78rem;
+  font-weight: 600;
+}

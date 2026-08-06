@@ -1,0 +1,9 @@
+name: web-search
+version: 1.0.0
+description: 搜索互联网获取公司面经和岗位信息
+risk_level: R2
+input_schema:
+  query: string
+  workspace_id: uuid
+output_schema:
+  results: array

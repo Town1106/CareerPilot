@@ -222,6 +222,8 @@ export type Run = {
   id: string;
   workspace_id: string;
   run_type: string;
+  skill_name: string | null;
+  skill_version: string | null;
   status: string;
   model_id: string | null;
   total_tokens: number;
@@ -240,4 +242,52 @@ export type RunDetail = Run & {
 export type RunList = {
   runs: Run[];
   total: number;
+};
+
+export type SkillItem = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  manifest_path: string;
+  risk_level: string;
+  status: string;
+  created_at: string;
+};
+
+export type SkillDetail = SkillItem & {
+  triggers: string[];
+  required_inputs: string[];
+  allowed_tools: string[];
+};
+
+export type ToolItem = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  manifest_path: string;
+  risk_level: string;
+  status: string;
+  created_at: string;
+};
+
+export type ToolDetail = ToolItem & {
+  input_schema: string | null;
+  output_schema: string | null;
+  require_approval: boolean;
+  approval_prompt: string | null;
+  max_per_session: number | null;
+};
+
+export type ApprovalItem = {
+  id: string;
+  workspace_id: string;
+  tool_name: string;
+  run_id: string | null;
+  requested_by_skill: string | null;
+  payload_summary: string;
+  status: string;
+  created_at: string;
+  decided_at: string | null;
 };

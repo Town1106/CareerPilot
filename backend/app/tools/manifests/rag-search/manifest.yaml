@@ -1,0 +1,10 @@
+name: rag-search
+version: 1.0.0
+description: 在知识库中检索相关文档片段
+risk_level: R0
+input_schema:
+  query: string
+  top_k: integer
+  workspace_id: uuid
+output_schema:
+  chunks: array

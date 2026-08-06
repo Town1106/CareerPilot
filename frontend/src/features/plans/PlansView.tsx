@@ -36,7 +36,7 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric", weekday: "short" });
 }
 
-export function PlansView({ workspace, onBack, onTraces }: { workspace: Workspace; onBack: () => void; onTraces?: () => void }) {
+export function PlansView({ workspace, onBack, onTraces, onSkills }: { workspace: Workspace; onBack: () => void; onTraces?: () => void; onSkills?: () => void }) {
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -113,6 +113,7 @@ export function PlansView({ workspace, onBack, onTraces }: { workspace: Workspac
           <p className="muted">{workspace.name}</p>
         </div>
         {onTraces && <button className="ghost" onClick={onTraces}>运行轨迹 →</button>}
+        {onSkills && <button className="ghost" onClick={onSkills}>技能中心 →</button>}
         <button
           className="primary"
           onClick={() => setShowCreate(true)}

@@ -8,6 +8,8 @@ class RunOut(BaseModel):
     id: uuid.UUID
     workspace_id: uuid.UUID
     run_type: str
+    skill_name: str | None
+    skill_version: str | None
     status: str
     model_id: str | None
     total_tokens: int

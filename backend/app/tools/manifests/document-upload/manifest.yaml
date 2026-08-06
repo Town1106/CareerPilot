@@ -1,0 +1,10 @@
+name: document-upload
+version: 1.0.0
+description: 上传文档到知识库
+risk_level: R1
+input_schema:
+  workspace_id: uuid
+  file_name: string
+  content: string
+output_schema:
+  document_id: uuid

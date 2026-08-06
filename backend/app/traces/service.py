@@ -116,6 +116,8 @@ async def get_run_detail(db: AsyncSession, run: AgentRun) -> RunDetailOut:
         id=run.id,
         workspace_id=run.workspace_id,
         run_type=run.run_type,
+        skill_name=run.skill_name,
+        skill_version=run.skill_version,
         status=run.status,
         model_id=run.model_id,
         total_tokens=run.total_tokens,

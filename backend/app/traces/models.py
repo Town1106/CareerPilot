@@ -15,6 +15,8 @@ class AgentRun(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
     )
     run_type: Mapped[str] = mapped_column(String(30))
+    skill_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    skill_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="running", server_default="running")
     model_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
