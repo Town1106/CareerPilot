@@ -120,7 +120,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
         ) : workspaceView === "tools" ? (
           <ToolsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("skills")} onGitHub={() => setWorkspaceView("github")} />
         ) : (
-          <GitHubView workspace={selectedWorkspace} onBack={() => setWorkspaceView("documents")} />
+          <GitHubView workspace={selectedWorkspace} onBack={() => setSelectedWorkspace(null)} />
         )
       ) : <><section className="workspace-hero">
         <div>
@@ -176,15 +176,60 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
               </p>
               <div className="card-actions">
                 <button className="primary" onClick={() => { openWorkspace(workspace, "documents"); }}>打开知识库</button>
-                <button className="ghost" onClick={() => { openWorkspace(workspace, "github"); }}>GitHub</button>
-                <button className="ghost" onClick={() => { openWorkspace(workspace, "traces"); }}>运行轨迹</button>
-                <button className="ghost" onClick={() => { openWorkspace(workspace, "skills"); }}>技能中心</button>
                 <button className="ghost" onClick={() => renameWorkspace(workspace)}>重命名</button>
                 <button className="danger" onClick={() => removeWorkspace(workspace)}>删除</button>
               </div>
             </article>
           ))
         )}
+      </section>
+
+      <section className="home-tools">
+        <h2 className="section-title">工具与服务</h2>
+        <div className="home-tools-grid">
+          <article className="home-tool-card">
+            <div className="tool-icon gh">&#9733;</div>
+            <h3>GitHub 集成</h3>
+            <p className="muted">连接你的 GitHub 仓库，浏览项目、导入 README 到知识库。</p>
+            <button
+              className="primary"
+              onClick={() => {
+                if (workspaces.length > 0) openWorkspace(workspaces[0], "github");
+              }}
+              disabled={workspaces.length === 0}
+            >
+              打开 GitHub
+            </button>
+          </article>
+          <article className="home-tool-card">
+            <div className="tool-icon trace">&#8986;</div>
+            <h3>运行轨迹</h3>
+            <p className="muted">查看 AI 操作的完整执行记录，包括 Token 用量、延迟和检索结果。</p>
+            <button
+              className="primary"
+              onClick={() => {
+                if (workspaces.length > 0) openWorkspace(workspaces[0], "traces");
+              }}
+              disabled={workspaces.length === 0}
+            >
+              查看轨迹
+            </button>
+          </article>
+          <article className="home-tool-card">
+            <div className="tool-icon skill">&#9881;</div>
+            <h3>技能中心</h3>
+            <p className="muted">管理 AI Skill 定义、触发条件和工具约束，配置 Agent 能力。</p>
+            <button
+              className="primary"
+              onClick={() => {
+                if (workspaces.length > 0) openWorkspace(workspaces[0], "skills");
+              }}
+              disabled={workspaces.length === 0}
+            >
+              管理技能
+            </button>
+          </article>
+        </div>
       </section>
       </>}
       {error && <div className="toast" role="alert">{error}</div>}
