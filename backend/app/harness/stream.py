@@ -1,4 +1,4 @@
-"""SSE 流式推送 — 将 LangGraph 执行过程转为 Server-Sent Events。"""
+"""SSE 流式推送 — 将 LangGraph 多节点执行过程转为 Server-Sent Events。"""
 
 import json
 import logging
@@ -17,7 +17,7 @@ async def stream_agent(
     user_id: str,
     input_data: dict,
 ) -> AsyncIterator[str]:
-    """执行 LangGraph 并将节点事件作为 SSE 流式推送。
+    """执行 LangGraph 多节点图并将每个节点的事件作为 SSE 流式推送。
 
     每个事件格式为 SSE: ``data: {json}\\n\\n``。
     """
@@ -36,8 +36,8 @@ async def stream_agent(
             "run_id": run_id,
         }
 
-        async for chunk in graph.astream(initial_state, {"recursion_limit": 10}):
-            for node_output in chunk.values():
+        async for chunk in graph.astream(initial_state, {"recursion_limit": 25}):
+            for node_name, node_output in chunk.items():
                 if isinstance(node_output, dict):
                     # 推送节点产出的事件
                     events = node_output.get("events", [])
@@ -47,7 +47,7 @@ async def stream_agent(
                     # 推送节点产出的错误
                     error = node_output.get("error")
                     if error:
-                        yield _sse({"event": "error", "message": str(error)})
+                        yield _sse({"event": "error", "node": node_name, "message": str(error)})
                         return
 
     except Exception as exc:

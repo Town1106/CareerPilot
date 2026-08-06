@@ -28,7 +28,7 @@ async def agent_stream(
 
     支持 skill_name: ``rag_qa``, ``jd_analysis``。
     """
-    if payload.skill_name not in ("rag_qa", "jd_analysis"):
+    if payload.skill_name not in ("rag_qa", "jd_analysis", "study_plan"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"不支持的 Skill: {payload.skill_name}")
 
     return StreamingResponse(
