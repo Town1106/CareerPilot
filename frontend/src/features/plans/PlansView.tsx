@@ -48,6 +48,8 @@ export function PlansView({ workspace, onBack, onTraces, onSkills }: { workspace
     new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
   );
   const [dailyMinutes, setDailyMinutes] = useState(120);
+  const [syncedTaskIds, setSyncedTaskIds] = useState<Set<string>>(new Set());
+  const [syncingTask, setSyncingTask] = useState<string | null>(null);
 
   const loadPlans = useCallback(async () => {
     try {
@@ -101,6 +103,29 @@ export function PlansView({ workspace, onBack, onTraces, onSkills }: { workspace
       await loadPlans();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "归档失败");
+    }
+  }
+
+  async function syncToCalendar(task: StudyTask) {
+    setSyncingTask(task.id);
+    try {
+      // 自动连接 Calendar（Mock 模式总是成功）
+      await api("/api/v1/mcp/calendar/connect", { method: "POST" });
+      await api("/api/v1/mcp/calendar/events", {
+        method: "POST",
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          date: task.scheduled_date,
+          duration_minutes: task.duration_minutes,
+          source_task_id: task.id,
+        }),
+      });
+      setSyncedTaskIds((prev) => new Set(prev).add(task.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "同步失败");
+    } finally {
+      setSyncingTask(null);
     }
   }
 
@@ -249,6 +274,17 @@ export function PlansView({ workspace, onBack, onTraces, onSkills }: { workspace
                                     跳过
                                   </button>
                                 </div>
+                              )}
+                              {syncedTaskIds.has(task.id) ? (
+                                <span className="calendar-synced">已同步</span>
+                              ) : (
+                                <button
+                                  className="ghost small"
+                                  disabled={syncingTask === task.id}
+                                  onClick={() => syncToCalendar(task)}
+                                >
+                                  {syncingTask === task.id ? "同步中…" : "添加到日历"}
+                                </button>
                               )}
                             </div>
                           </div>

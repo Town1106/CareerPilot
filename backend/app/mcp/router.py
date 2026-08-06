@@ -12,8 +12,11 @@ from app.core.config import DASHSCOPE_API_KEY
 from app.core.database import get_db
 from app.documents import files
 from app.documents.models import Document, DocumentChunk, DocumentVersion
+from app.mcp.calendar_client import get_calendar_client
 from app.mcp.github_client import get_github_client
 from app.mcp.schemas import (
+    CalendarEventCreate,
+    CalendarEventOut,
     CommitItem,
     CommitList,
     FileContent,
@@ -274,3 +277,76 @@ async def get_file(
     except (ValueError, UnicodeDecodeError):
         content = raw
     return FileContent(path=path, content=content, size=size)
+
+
+# ── Calendar MCP ──
+
+_calendar_active = False
+
+
+@router.post("/api/v1/mcp/calendar/connect", response_model=MCPStatus)
+async def connect_calendar(user: User = Depends(current_user)) -> MCPStatus:
+    global _calendar_active
+    client = get_calendar_client()
+    try:
+        await client.connect()
+        if client.connected:
+            _calendar_active = True
+            return MCPStatus(provider="calendar", connected=True, message="Calendar 连接成功")
+        return MCPStatus(provider="calendar", connected=False, message="Calendar 不可用")
+    except Exception as e:
+        logger.exception("Calendar connect failed")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Calendar 连接失败: {e}") from e
+
+
+@router.post("/api/v1/mcp/calendar/disconnect", response_model=MCPStatus)
+async def disconnect_calendar(user: User = Depends(current_user)) -> MCPStatus:
+    global _calendar_active
+    client = get_calendar_client()
+    await client.disconnect()
+    _calendar_active = False
+    return MCPStatus(provider="calendar", connected=False, message="Calendar 已断开")
+
+
+@router.post("/api/v1/mcp/calendar/events", response_model=CalendarEventOut)
+async def create_calendar_event(
+    payload: CalendarEventCreate,
+    user: User = Depends(current_user),
+) -> CalendarEventOut:
+    client = get_calendar_client()
+    if not client.connected:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Calendar 未连接")
+    event = await client.create_event(
+        user_id=str(user.id),
+        title=payload.title,
+        description=payload.description,
+        event_date=payload.date,
+        duration_minutes=payload.duration_minutes,
+        source_task_id=payload.source_task_id,
+    )
+    return CalendarEventOut(**event)
+
+
+@router.get("/api/v1/mcp/calendar/events", response_model=list[CalendarEventOut])
+async def list_calendar_events(
+    user: User = Depends(current_user),
+) -> list[CalendarEventOut]:
+    client = get_calendar_client()
+    if not client.connected:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Calendar 未连接")
+    events = await client.list_events(str(user.id))
+    return [CalendarEventOut(**ev) for ev in events]
+
+
+@router.delete("/api/v1/mcp/calendar/events/{event_id}")
+async def delete_calendar_event(
+    event_id: str,
+    user: User = Depends(current_user),
+) -> dict[str, bool]:
+    client = get_calendar_client()
+    if not client.connected:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Calendar 未连接")
+    deleted = await client.delete_event(str(user.id), event_id)
+    if not deleted:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "事件不存在")
+    return {"deleted": True}

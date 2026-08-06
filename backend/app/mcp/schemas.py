@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel
 
 
@@ -48,3 +50,21 @@ class CommitList(BaseModel):
 class ImportRequest(BaseModel):
     workspace_id: str
     repo_full_name: str
+
+
+class CalendarEventCreate(BaseModel):
+    title: str
+    description: str
+    date: datetime.date
+    duration_minutes: int
+    source_task_id: str | None = None
+
+
+class CalendarEventOut(BaseModel):
+    id: str
+    title: str
+    description: str
+    date: str
+    duration_minutes: int
+    source_task_id: str | None = None
+    created_at: str
