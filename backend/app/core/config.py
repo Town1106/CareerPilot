@@ -1,4 +1,15 @@
 import os
+from pathlib import Path
+
+# 加载 backend/.env
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key, val)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./careerpilot.db")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")

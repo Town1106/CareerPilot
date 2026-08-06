@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.schemas import (
@@ -18,13 +19,14 @@ from app.analysis.service import (
 from app.auth.dependencies import current_user
 from app.auth.models import User
 from app.core.database import get_db
+from app.workspaces.models import Workspace
 
 router = APIRouter(tags=["analysis"])
 logger = logging.getLogger(__name__)
 
 
 async def _workspace(user: User, db: AsyncSession):
-    ws = await user.get_owned_workspace(db)
+    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
     if not ws:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
     return ws

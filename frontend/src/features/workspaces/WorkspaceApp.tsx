@@ -20,6 +20,11 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [workspaceView, setWorkspaceView] = useState<"documents" | "jobs" | "interviews" | "plans" | "traces" | "skills" | "tools" | "github">("documents");
 
+  function openWorkspace(ws: Workspace, view: typeof workspaceView) {
+    setSelectedWorkspace(ws);
+    setWorkspaceView(view);
+  }
+
   const loadWorkspaces = useCallback(async () => {
     try {
       setWorkspaces(await api<Workspace[]>("/api/v1/workspaces"));
@@ -115,7 +120,7 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
         ) : workspaceView === "tools" ? (
           <ToolsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("skills")} onGitHub={() => setWorkspaceView("github")} />
         ) : (
-          <GitHubView workspace={selectedWorkspace} onBack={() => setWorkspaceView("tools")} />
+          <GitHubView workspace={selectedWorkspace} onBack={() => setWorkspaceView("documents")} />
         )
       ) : <><section className="workspace-hero">
         <div>
@@ -170,7 +175,8 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
                 创建于 {new Date(workspace.created_at).toLocaleDateString("zh-CN")}
               </p>
               <div className="card-actions">
-                <button className="primary" onClick={() => { setSelectedWorkspace(workspace); setWorkspaceView("documents"); }}>打开知识库</button>
+                <button className="primary" onClick={() => { openWorkspace(workspace, "documents"); }}>打开知识库</button>
+                <button className="ghost" onClick={() => { openWorkspace(workspace, "github"); }}>GitHub</button>
                 <button className="ghost" onClick={() => renameWorkspace(workspace)}>重命名</button>
                 <button className="danger" onClick={() => removeWorkspace(workspace)}>删除</button>
               </div>

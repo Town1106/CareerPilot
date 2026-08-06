@@ -16,6 +16,7 @@ from app.tools.schemas import (
     ToolListOut,
     ToolOut,
 )
+from app.workspaces.models import Workspace
 
 router = APIRouter(tags=["tools"])
 
@@ -61,7 +62,7 @@ async def list_pending_approvals(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ApprovalListOut:
-    ws = await user.get_owned_workspace(db)
+    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
     if not ws:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
     rows = list(

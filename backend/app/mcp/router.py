@@ -1,10 +1,17 @@
 import base64
+import hashlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import current_user
 from app.auth.models import User
+from app.core.config import DASHSCOPE_API_KEY
+from app.core.database import get_db
+from app.documents import files
+from app.documents.models import Document, DocumentChunk, DocumentVersion
 from app.mcp.github_client import get_github_client
 from app.mcp.schemas import (
     CommitItem,
@@ -15,6 +22,8 @@ from app.mcp.schemas import (
     RepoList,
     RepoSummary,
 )
+from app.rag.service import index_document
+from app.workspaces.models import Workspace
 
 router = APIRouter(tags=["mcp"])
 logger = logging.getLogger(__name__)
@@ -72,7 +81,7 @@ async def list_repos(
     )
 
 
-@router.get("/api/v1/mcp/github/repos/{owner}/{repo:path}", response_model=RepoDetail)
+@router.get("/api/v1/mcp/github/repos/{owner}/{repo}", response_model=RepoDetail)
 async def get_repo(
     owner: str,
     repo: str,
@@ -97,7 +106,7 @@ async def get_repo(
     )
 
 
-@router.get("/api/v1/mcp/github/repos/{owner}/{repo:path}/readme")
+@router.get("/api/v1/mcp/github/repos/{owner}/{repo}/readme")
 async def get_readme(
     owner: str,
     repo: str,
@@ -115,7 +124,7 @@ async def get_readme(
         return {"content": b64}
 
 
-@router.get("/api/v1/mcp/github/repos/{owner}/{repo:path}/commits", response_model=CommitList)
+@router.get("/api/v1/mcp/github/repos/{owner}/{repo}/commits", response_model=CommitList)
 async def list_commits(
     owner: str,
     repo: str,
@@ -139,7 +148,98 @@ async def list_commits(
     )
 
 
-@router.get("/api/v1/mcp/github/repos/{owner}/{repo:path}/files/{path:path}")
+@router.post("/api/v1/mcp/github/repos/{owner}/{repo}/import")
+async def import_readme(
+    owner: str,
+    repo: str,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    client = get_github_client()
+    if not client.connected:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "GitHub 未连接")
+    b64 = await client.get_readme(owner, repo)
+    if not b64:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "该仓库没有 README")
+    try:
+        text = base64.b64decode(b64).decode("utf-8", errors="replace")
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "无法解码 README")
+
+    content = text.encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+
+    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
+    if not ws:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
+
+    # 检查重复
+    duplicate = (
+        await db.execute(
+            select(Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+            .where(Document.workspace_id == ws.id, DocumentVersion.sha256 == digest)
+            .limit(1)
+        )
+    ).first()
+    if duplicate:
+        return {"imported": False, "message": "README 已存在于知识库中"}
+
+    original_name = f"{owner}/{repo}.md"
+    chunks = files.make_chunks([(None, text)])
+
+    document = Document(
+        workspace_id=ws.id,
+        original_name=original_name,
+        category="project",
+    )
+    db.add(document)
+    await db.flush()
+
+    stored_name = files.save_file(".md", content)
+    version = DocumentVersion(
+        document_id=document.id,
+        version=1,
+        original_name=original_name,
+        stored_name=stored_name,
+        media_type="text/markdown",
+        size_bytes=len(content),
+        sha256=digest,
+        status="parsed",
+        chunk_count=len(chunks),
+    )
+    db.add(version)
+    await db.flush()
+
+    db.add_all(
+        DocumentChunk(
+            version_id=version.id,
+            position=idx,
+            page_number=None,
+            content=chunk_text,
+        )
+        for idx, (_, chunk_text) in enumerate(chunks)
+    )
+    document.original_name = original_name
+    document.active_version_id = version.id
+    await db.commit()
+    await db.refresh(document)
+    await db.refresh(version)
+
+    if DASHSCOPE_API_KEY:
+        version = await index_document(db, document, version)
+
+    return {
+        "imported": True,
+        "document_id": str(document.id),
+        "version_id": str(version.id),
+        "name": original_name,
+        "chunks": len(chunks),
+        "status": version.status,
+    }
+
+
+@router.get("/api/v1/mcp/github/repos/{owner}/{repo}/files/{path:path}")
 async def get_file(
     owner: str,
     repo: str,

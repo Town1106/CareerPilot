@@ -19,6 +19,8 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
   const [report, setReport] = useState<ConsistencyReport | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   async function connect() {
     setLoading(true);
@@ -126,12 +128,35 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
     }
   }
 
+  async function doImport() {
+    if (!selectedRepo) return;
+    setImporting(true);
+    setError("");
+    try {
+      const [owner, repo] = selectedRepo.full_name.split("/");
+      const data = await api<{ imported: boolean; message?: string; status?: string }>(
+        `/api/v1/mcp/github/repos/${owner}/${repo}/import`,
+        { method: "POST" }
+      );
+      if (data.imported) {
+        setImported(true);
+      } else {
+        setError(data.message || "导入失败");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "导入失败");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   useEffect(() => {
     setSelectedRepo(null);
     setRepos([]);
     setConnected(false);
     setFact(null);
     setReport(null);
+    setImported(false);
   }, [workspace.id]);
 
   return (
@@ -193,6 +218,9 @@ export function GitHubView({ workspace, onBack }: { workspace: Workspace; onBack
                     {checking ? "校验中…" : "✓ 简历一致性校验"}
                   </button>
                 )}
+                <button className="ghost" onClick={doImport} disabled={importing || imported}>
+                  {importing ? "导入中…" : imported ? "✓ 已导入知识库" : "📥 导入到知识库"}
+                </button>
               </div>
             </div>
 
