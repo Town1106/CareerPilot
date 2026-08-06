@@ -114,9 +114,9 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
         ) : workspaceView === "plans" ? (
           <PlansView workspace={selectedWorkspace} onBack={() => setWorkspaceView("interviews")} onTraces={() => setWorkspaceView("traces")} onSkills={() => setWorkspaceView("skills")} />
         ) : workspaceView === "traces" ? (
-          <TracesView workspace={selectedWorkspace} onBack={() => setWorkspaceView("plans")} />
+          <TracesView workspace={selectedWorkspace} onBack={() => setSelectedWorkspace(null)} />
         ) : workspaceView === "skills" ? (
-          <SkillsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("traces")} onTools={() => setWorkspaceView("tools")} />
+          <SkillsView workspace={selectedWorkspace} onBack={() => setSelectedWorkspace(null)} onTools={() => setWorkspaceView("tools")} />
         ) : workspaceView === "tools" ? (
           <ToolsView workspace={selectedWorkspace} onBack={() => setWorkspaceView("skills")} onGitHub={() => setWorkspaceView("github")} />
         ) : (
@@ -177,6 +177,8 @@ export function WorkspaceApp({ user, onLogout }: { user: User; onLogout: () => v
               <div className="card-actions">
                 <button className="primary" onClick={() => { openWorkspace(workspace, "documents"); }}>打开知识库</button>
                 <button className="ghost" onClick={() => { openWorkspace(workspace, "github"); }}>GitHub</button>
+                <button className="ghost" onClick={() => { openWorkspace(workspace, "traces"); }}>运行轨迹</button>
+                <button className="ghost" onClick={() => { openWorkspace(workspace, "skills"); }}>技能中心</button>
                 <button className="ghost" onClick={() => renameWorkspace(workspace)}>重命名</button>
                 <button className="danger" onClick={() => removeWorkspace(workspace)}>删除</button>
               </div>

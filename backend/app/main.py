@@ -9,6 +9,7 @@ from app.auth.router import router as auth_router
 from app.core.config import FRONTEND_ORIGIN
 from app.core.database import SessionFactory
 from app.documents.router import router as document_router
+from app.harness.router import router as harness_router
 from app.interviews.router import router as interview_router
 from app.jobs.router import router as job_router
 from app.mcp.router import router as mcp_router
@@ -54,6 +55,7 @@ app.include_router(analysis_router)
 app.include_router(auth_router)
 app.include_router(workspace_router)
 app.include_router(document_router)
+app.include_router(harness_router)
 app.include_router(rag_router)
 app.include_router(job_router)
 app.include_router(mcp_router)

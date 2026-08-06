@@ -1,0 +1,13 @@
+{
+  "e6cefc1a-75e2-4a94-8022-27a4cf1409ea": [
+    {
+      "id": "539bf9e8-c23d-4895-8105-87c7fd122242",
+      "title": "LLM与Agent核心原理突击",
+      "description": "深入理解Transformer架构基础、Attention机制；重点学习Agent的ReAct范式、规划（Planning）与记忆（Memory）模块设计原理。阅读相关论文摘要或高质量技术博客，建立理论框架。",
+      "date": "2026-08-06",
+      "duration_minutes": 60,
+      "source_task_id": "989fd33e-ce15-4cd1-a857-ce7b08755ef9",
+      "created_at": "2026-08-06T05:46:16.707332+00:00"
+    }
+  ]
+}
