@@ -1,9 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api";
-import type { Document, DocumentVersion, RagAnswer, Workspace } from "../../types";
+import type { Document, DocumentVersion, RagAnswer, RepoSummary, Workspace } from "../../types";
 
-const CATEGORY_NAMES = { resume: "简历", project: "项目资料", other: "其他资料" };
+const CATEGORY_NAMES = { resume: "简历", project: "项目资料", other: "其他资料", github: "GitHub 项目" };
 const STATUS_NAMES: Record<string, string> = {
   parsed: "待索引",
   indexing: "索引中",
@@ -14,7 +14,7 @@ const STATUS_NAMES: Record<string, string> = {
 export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Workspace; onBack: () => void; onJobs: () => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [file, setFile] = useState<File | null>(null);
-  const [category, setCategory] = useState<Document["category"]>("resume");
+  const [category, setCategory] = useState<"resume" | "project" | "other" | "github">("resume");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [indexingId, setIndexingId] = useState<string | null>(null);
@@ -22,6 +22,10 @@ export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Worksp
   const [openVersionsId, setOpenVersionsId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Record<string, DocumentVersion[]>>({});
   const [reindexing, setReindexing] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<RepoSummary[]>([]);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [importingRepo, setImportingRepo] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [result, setResult] = useState<RagAnswer | null>(null);
@@ -42,8 +46,40 @@ export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Worksp
     void loadDocuments();
   }, [loadDocuments]);
 
+  async function loadGithubRepos() {
+    setGithubLoading(true);
+    try {
+      const data = await api<{ repos: RepoSummary[] }>("/api/v1/mcp/github/repos");
+      setGithubRepos(data.repos);
+    } catch {
+      setError("无法加载 GitHub 仓库，请确认已连接 GitHub");
+    } finally {
+      setGithubLoading(false);
+    }
+  }
+
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (category === "github") {
+      if (!selectedRepo) return;
+      setImportingRepo(true);
+      setError("");
+      try {
+        const doc = await api<Document>("/api/v1/mcp/github/import", {
+          method: "POST",
+          body: JSON.stringify({ workspace_id: workspace.id, repo_full_name: selectedRepo }),
+        });
+        if (doc.id) {
+          setDocuments((items) => [doc, ...items]);
+          setSelectedRepo("");
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "导入失败");
+      } finally {
+        setImportingRepo(false);
+      }
+      return;
+    }
     if (!file) return;
     const form = event.currentTarget;
     const body = new FormData();
@@ -188,24 +224,42 @@ export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Worksp
           <h2>上传求职资料</h2>
           <label>
             文档类型
-            <select value={category} onChange={(event) => setCategory(event.target.value as Document["category"])}>
+            <select value={category} onChange={(event) => {
+            const val = event.target.value as typeof category;
+            setCategory(val);
+            if (val === "github") void loadGithubRepos();
+            setSelectedRepo("");
+          }}>
               <option value="resume">简历</option>
               <option value="project">项目资料</option>
+              <option value="github">GitHub 项目</option>
               <option value="other">其他资料</option>
             </select>
           </label>
-          <label>
-            文件
-            <input
-              type="file"
-              accept=".pdf,.docx,.txt,.md"
-              required
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
-          </label>
-          <p className="hint">支持 PDF、DOCX、TXT、Markdown，单文件不超过 10 MB。</p>
-          <button className="primary" disabled={uploading || !file}>
-            {uploading ? "正在解析…" : "上传并解析"}
+          {category === "github" ? (
+            <label>
+              GitHub 仓库
+              <select value={selectedRepo} onChange={(e) => setSelectedRepo(e.target.value)}>
+                <option value="">{githubLoading ? "加载中…" : "选择仓库"}</option>
+                {githubRepos.map((r) => (
+                  <option key={r.full_name} value={r.full_name}>{r.full_name}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              文件
+              <input
+                type="file"
+                accept=".pdf,.docx,.txt,.md"
+                required
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+            </label>
+          )}
+          <p className="hint">{category === "github" ? "选择仓库后将 README 导入为项目资料。" : "支持 PDF、DOCX、TXT、Markdown，单文件不超过 10 MB。"}</p>
+          <button className="primary" disabled={category === "github" ? (importingRepo || !selectedRepo) : (uploading || !file)}>
+            {category === "github" ? (importingRepo ? "正在导入…" : "导入 README") : uploading ? "正在解析…" : "上传并解析"}
           </button>
         </form>
 

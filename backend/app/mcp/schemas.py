@@ -43,3 +43,8 @@ class RepoList(BaseModel):
 
 class CommitList(BaseModel):
     commits: list[CommitItem]
+
+
+class ImportRequest(BaseModel):
+    workspace_id: str
+    repo_full_name: str

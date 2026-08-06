@@ -17,6 +17,7 @@ from app.mcp.schemas import (
     CommitItem,
     CommitList,
     FileContent,
+    ImportRequest,
     MCPStatus,
     RepoDetail,
     RepoList,
@@ -148,12 +149,8 @@ async def list_commits(
     )
 
 
-@router.post("/api/v1/mcp/github/repos/{owner}/{repo}/import")
-async def import_readme(
-    owner: str,
-    repo: str,
-    user: User = Depends(current_user),
-    db: AsyncSession = Depends(get_db),
+async def _import_readme(
+    db: AsyncSession, workspace_id: str, owner: str, repo: str
 ) -> dict:
     client = get_github_client()
     if not client.connected:
@@ -169,16 +166,11 @@ async def import_readme(
     content = text.encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
 
-    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
-    if not ws:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
-
-    # 检查重复
     duplicate = (
         await db.execute(
             select(Document, DocumentVersion)
             .join(DocumentVersion, DocumentVersion.document_id == Document.id)
-            .where(Document.workspace_id == ws.id, DocumentVersion.sha256 == digest)
+            .where(Document.workspace_id == workspace_id, DocumentVersion.sha256 == digest)
             .limit(1)
         )
     ).first()
@@ -189,7 +181,7 @@ async def import_readme(
     chunks = files.make_chunks([(None, text)])
 
     document = Document(
-        workspace_id=ws.id,
+        workspace_id=workspace_id,
         original_name=original_name,
         category="project",
     )
@@ -237,6 +229,29 @@ async def import_readme(
         "chunks": len(chunks),
         "status": version.status,
     }
+
+
+@router.post("/api/v1/mcp/github/import")
+async def import_to_workspace(
+    body: ImportRequest,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    owner, repo = body.repo_full_name.split("/", 1)
+    return await _import_readme(db, body.workspace_id, owner, repo)
+
+
+@router.post("/api/v1/mcp/github/repos/{owner}/{repo}/import")
+async def import_readme(
+    owner: str,
+    repo: str,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
+    if not ws:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
+    return await _import_readme(db, str(ws.id), owner, repo)
 
 
 @router.get("/api/v1/mcp/github/repos/{owner}/{repo}/files/{path:path}")
