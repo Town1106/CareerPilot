@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import DASHSCOPE_CHAT_MODEL
 from app.core.database import utc_now
 from app.interviews.models import (
     CompetencyMemory,
@@ -32,6 +33,7 @@ from app.jobs.service import normalize_competency
 from app.plans.service import adjust_priorities_after_interview
 from app.rag import gateway
 from app.rag.gateway import AIServiceError
+from app.traces.service import add_step, create_run, finalize_run
 
 COVERAGE_PRIORITY = {"conflict": 0, "uncovered": 0, "partial": 1, "covered": 2}
 
@@ -61,29 +63,48 @@ async def generate_question(
     competency: Competency,
     interview_type: str,
     previous_questions: list[str],
+    workspace_id: str,
+    db: AsyncSession,
 ) -> str:
-    payload = await gateway.structured_chat(
-        (
-            "你是严格但友好的模拟面试官。返回 JSON 对象，字段只有 question。"
-            "一次只问一个问题，不提供答案、提示、评分标准或多段子问题。"
-            "问题必须考察指定能力，并结合岗位要求和候选人当前证据状态。"
-        ),
-        json.dumps(
-            {
-                "interview_type": interview_type,
-                "competency": competency.canonical_name,
-                "job_requirement": requirement.raw_evidence,
-                "current_evidence_status": requirement.coverage,
-                "evidence_summary": requirement.explanation,
-                "avoid_repeating": previous_questions[-5:],
-            },
-            ensure_ascii=False,
-        ),
-    )
+    run = await create_run(db, workspace_id, "interview_generate_question", DASHSCOPE_CHAT_MODEL)
     try:
-        return QuestionResult.model_validate(payload).question
-    except ValidationError as error:
-        raise AIServiceError("面试问题未通过结构校验") from error
+        usage = {}
+        payload = await gateway.structured_chat(
+            (
+                "你是严格但友好的模拟面试官。返回 JSON 对象，字段只有 question。"
+                "一次只问一个问题，不提供答案、提示、评分标准或多段子问题。"
+                "问题必须考察指定能力，并结合岗位要求和候选人当前证据状态。"
+            ),
+            json.dumps(
+                {
+                    "interview_type": interview_type,
+                    "competency": competency.canonical_name,
+                    "job_requirement": requirement.raw_evidence,
+                    "current_evidence_status": requirement.coverage,
+                    "evidence_summary": requirement.explanation,
+                    "avoid_repeating": previous_questions[-5:],
+                },
+                ensure_ascii=False,
+            ),
+            usage=usage,
+        )
+        await add_step(
+            db, run, "generate", status="completed",
+            input_summary=f"为 {competency.canonical_name} 生成题目",
+            output_summary=str(payload.get("question", ""))[:500],
+        )
+        await finalize_run(
+            db, run, "completed",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+        )
+        try:
+            return QuestionResult.model_validate(payload).question
+        except ValidationError as error:
+            raise AIServiceError("面试问题未通过结构校验") from error
+    except AIServiceError as error:
+        await finalize_run(db, run, "failed", error_code=str(error)[:500])
+        raise
 
 
 def real_question_quota(session: InterviewSession) -> int:
@@ -155,6 +176,8 @@ async def next_turn(
         competency,
         session.interview_type,
         [turn.question for turn in turns],
+        session.workspace_id,
+        db,
     )
     return InterviewTurn(
         session_id=session.id,
@@ -165,59 +188,97 @@ async def next_turn(
     )
 
 
-async def assess_answer(turn: InterviewTurn, answer: str) -> AnswerAssessment:
-    payload = await gateway.structured_chat(
-        (
-            "你是模拟面试流程控制器。只在回答含糊、缺少关键原理或项目细节时追问。"
-            "返回 JSON：quality(0-100)、should_follow_up、observation、follow_up_question。"
-            "追问必须只有一个问题且不能泄露参考答案；不追问时 follow_up_question 为 null。"
-        ),
-        json.dumps(
-            {
-                "competency": turn.competency_name,
-                "question": turn.question,
-                "answer": answer,
-            },
-            ensure_ascii=False,
-        ),
-    )
+async def assess_answer(
+    turn: InterviewTurn, answer: str, workspace_id: str, db: AsyncSession,
+) -> AnswerAssessment:
+    run = await create_run(db, workspace_id, "interview_assess", DASHSCOPE_CHAT_MODEL)
     try:
-        return AnswerAssessment.model_validate(payload)
-    except ValidationError as error:
-        raise AIServiceError("回答判断未通过结构校验") from error
+        usage = {}
+        payload = await gateway.structured_chat(
+            (
+                "你是模拟面试流程控制器。只在回答含糊、缺少关键原理或项目细节时追问。"
+                "返回 JSON：quality(0-100)、should_follow_up、observation、follow_up_question。"
+                "追问必须只有一个问题且不能泄露参考答案；不追问时 follow_up_question 为 null。"
+            ),
+            json.dumps(
+                {
+                    "competency": turn.competency_name,
+                    "question": turn.question,
+                    "answer": answer,
+                },
+                ensure_ascii=False,
+            ),
+            usage=usage,
+        )
+        await add_step(
+            db, run, "assess", status="completed",
+            input_summary=f"评估 {turn.competency_name} 回答",
+            output_summary=payload.get("observation", "")[:500],
+        )
+        await finalize_run(
+            db, run, "completed",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+        )
+        try:
+            return AnswerAssessment.model_validate(payload)
+        except ValidationError as error:
+            raise AIServiceError("回答判断未通过结构校验") from error
+    except AIServiceError as error:
+        await finalize_run(db, run, "failed", error_code=str(error)[:500])
+        raise
 
 
-async def build_report(turns: list[InterviewTurn]) -> InterviewReportResult:
+async def build_report(
+    turns: list[InterviewTurn], workspace_id: str, db: AsyncSession,
+) -> InterviewReportResult:
     answered = [turn for turn in turns if turn.answer]
-    payload = await gateway.structured_chat(
-        (
-            "你是独立面试评分官，只根据候选人的实际回答评分，不推断未说出的知识。"
-            "返回 JSON：overall_score、summary、strengths、issues、competency_scores。"
-            "competency_scores 每项包含 competency、score、rubric、evidence、strengths、issues、suggestion。"
-            "evidence 必须引用回答序号并概括原话；评分标准、优点、问题和建议必须具体。"
-        ),
-        json.dumps(
-            {
-                "allowed_competencies": list(
-                    dict.fromkeys(turn.competency_name for turn in answered)
-                ),
-                "answers": [
-                    {
-                        "sequence": turn.sequence,
-                        "competency": turn.competency_name,
-                        "question": turn.question,
-                        "answer": turn.answer,
-                    }
-                    for turn in answered
-                ],
-            },
-            ensure_ascii=False,
-        ),
-    )
+    run = await create_run(db, workspace_id, "interview_report", DASHSCOPE_CHAT_MODEL)
     try:
-        return InterviewReportResult.model_validate(payload)
-    except ValidationError as error:
-        raise AIServiceError("面试报告未通过结构校验") from error
+        usage = {}
+        payload = await gateway.structured_chat(
+            (
+                "你是独立面试评分官，只根据候选人的实际回答评分，不推断未说出的知识。"
+                "返回 JSON：overall_score、summary、strengths、issues、competency_scores。"
+                "competency_scores 每项包含 competency、score、rubric、evidence、strengths、issues、suggestion。"
+                "evidence 必须引用回答序号并概括原话；评分标准、优点、问题和建议必须具体。"
+            ),
+            json.dumps(
+                {
+                    "allowed_competencies": list(
+                        dict.fromkeys(turn.competency_name for turn in answered)
+                    ),
+                    "answers": [
+                        {
+                            "sequence": turn.sequence,
+                            "competency": turn.competency_name,
+                            "question": turn.question,
+                            "answer": turn.answer,
+                        }
+                        for turn in answered
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            usage=usage,
+        )
+        await add_step(
+            db, run, "generate_report", status="completed",
+            input_summary=f"为 {len(answered)} 题生成评分报告",
+            output_summary=payload.get("summary", "")[:500],
+        )
+        await finalize_run(
+            db, run, "completed",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+        )
+        try:
+            return InterviewReportResult.model_validate(payload)
+        except ValidationError as error:
+            raise AIServiceError("面试报告未通过结构校验") from error
+    except AIServiceError as error:
+        await finalize_run(db, run, "failed", error_code=str(error)[:500])
+        raise
 
 
 async def get_interview(db: AsyncSession, session: InterviewSession) -> InterviewOut:
@@ -294,11 +355,22 @@ async def start_interview(db: AsyncSession, session: InterviewSession) -> Interv
         job = await db.scalar(
             select(JobDescription).where(JobDescription.id == session.job_description_id)
         )
-        candidates = await search_company_questions(db, job, real_target, session.interview_type)
-        if len(candidates) < real_target:
-            raise InterviewStateError(
-                f"真实面经题不足：需要 {real_target} 道，仅找到 {len(candidates)} 道"
+        run = await create_run(db, session.workspace_id, "interview_search", DASHSCOPE_CHAT_MODEL)
+        try:
+            candidates = await search_company_questions(db, job, real_target, session.interview_type)
+            await add_step(
+                db, run, "search", status="completed",
+                input_summary=f"搜索 {job.company} {job.title} 面经",
+                output_summary=f"找到 {len(candidates)} 道题",
             )
+            await finalize_run(db, run, "completed")
+            if len(candidates) < real_target:
+                raise InterviewStateError(
+                    f"真实面经题不足：需要 {real_target} 道，仅找到 {len(candidates)} 道"
+                )
+        except AIServiceError as error:
+            await finalize_run(db, run, "failed", error_code=str(error)[:500])
+            raise
 
     db.add(await next_turn(db, session, rows, []))
     session.status = "in_progress"
@@ -320,7 +392,7 @@ async def finalize_interview(db: AsyncSession, session: InterviewSession) -> Int
     )
     if not any(turn.answer for turn in turns):
         raise InterviewStateError("至少回答一道题后才能结束面试")
-    report = await build_report(turns)
+    report = await build_report(turns, session.workspace_id, db)
     allowed = {normalize_competency(turn.competency_name) for turn in turns if turn.answer}
     seen = set()
     valid_scores = []
@@ -405,7 +477,7 @@ async def submit_answer(db: AsyncSession, session: InterviewSession, answer: str
     current = turns[-1]
     if current.answer:
         raise InterviewStateError("当前没有待回答的问题")
-    assessment = await assess_answer(current, answer)
+    assessment = await assess_answer(current, answer, session.workspace_id, db)
     current.answer = answer.strip()
     current.private_observation = assessment.observation
     current.answered_at = utc_now()

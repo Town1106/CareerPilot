@@ -203,3 +203,41 @@ export type StudyPlan = {
   completed_tasks: number;
   coverage: number;
 };
+
+export type RunStep = {
+  id: string;
+  run_id: string;
+  step_name: string;
+  status: string;
+  input_summary: string | null;
+  output_summary: string | null;
+  retrieved_chunks: string | null;
+  latency_ms: number;
+  error_code: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type Run = {
+  id: string;
+  workspace_id: string;
+  run_type: string;
+  status: string;
+  model_id: string | null;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  latency_ms: number;
+  error_code: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type RunDetail = Run & {
+  steps: RunStep[];
+};
+
+export type RunList = {
+  runs: Run[];
+  total: number;
+};

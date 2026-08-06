@@ -18,7 +18,7 @@ def create_analyzed_job(client: TestClient, monkeypatch) -> tuple[str, str]:
         json={"name": "公司面经", "target_role": "Java 后端"},
     ).json()
 
-    async def extract(_: str, __: str) -> dict:
+    async def extract(_: str, __: str, **__kwargs: object) -> dict:
         return {
             "requirements": [
                 {
@@ -63,7 +63,7 @@ def test_question_modes_shortage_and_pool_reuse(client: TestClient, monkeypatch)
         web_calls.append(excluded_questions)
         return "搜索到两道公开面经题。", [source_one, source_two]
 
-    async def fake_structured(system: str, _: str) -> dict:
+    async def fake_structured(system: str, _: str, **__kwargs: object) -> dict:
         if "面经题库结构化抽取器" in system:
             return {
                 "questions": [

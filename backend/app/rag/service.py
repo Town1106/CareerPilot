@@ -5,13 +5,14 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import RAG_RETRIEVAL_MODE, RAG_TOP_K
+from app.core.config import DASHSCOPE_CHAT_MODEL, RAG_RETRIEVAL_MODE, RAG_TOP_K
 from app.core.database import utc_now
 from app.documents.models import Document, DocumentChunk, DocumentVersion
 from app.rag import gateway, store
 from app.rag.gateway import AIServiceError
 from app.rag.schemas import AnswerOut, CitationOut
 from app.rag.store import VectorStoreError
+from app.traces.service import add_step, create_run, finalize_run
 
 
 async def retrieve_chunks(
@@ -93,35 +94,73 @@ async def index_document(
     return version
 
 
-async def answer_question(db: AsyncSession, workspace_id: uuid.UUID, question: str) -> AnswerOut:
-    hits = await retrieve_chunks(db, workspace_id, question)
-    if not hits:
-        return AnswerOut(answer="当前知识库中没有可用于回答该问题的已索引证据。", citations=[])
-
-    evidence: list[tuple[str, DocumentChunk, Document, DocumentVersion, float]] = []
-    for chunk, document, version, score in hits:
-        label = f"S{len(evidence) + 1}"
-        evidence.append((label, chunk, document, version, score))
-
-    sources = [
-        f"[{label}] 文件：{version.original_name}；"
-        f"页码：{chunk.page_number or '无'}；内容：{chunk.content}"
-        for label, chunk, _, version, _ in evidence
-    ]
-    answer = await gateway.answer_with_context(question, sources)
-    cited_labels = set(re.findall(r"\[S(\d+)\]", answer))
-    citations = [
-        CitationOut(
-            label=label,
-            chunk_id=chunk.id,
-            document_id=document.id,
-            original_name=version.original_name,
-            page_number=chunk.page_number,
-            position=chunk.position,
-            content=chunk.content,
-            score=score,
+async def answer_question(
+    db: AsyncSession, workspace_id: uuid.UUID, question: str
+) -> AnswerOut:
+    run = await create_run(db, workspace_id, "rag_qa", DASHSCOPE_CHAT_MODEL)
+    try:
+        hits = await retrieve_chunks(db, workspace_id, question)
+        chunk_records = [
+            {
+                "chunk_id": str(chunk.id),
+                "document": version.original_name,
+                "score": round(score, 4),
+                "content": chunk.content[:200],
+            }
+            for chunk, _, version, score in hits
+        ]
+        await add_step(
+            db, run, "retrieve", status="completed",
+            input_summary=question[:500],
+            retrieved_chunks=chunk_records,
+            latency_ms=0,
         )
-        for label, chunk, document, version, score in evidence
-        if label.removeprefix("S") in cited_labels
-    ]
-    return AnswerOut(answer=answer, citations=citations)
+        if not hits:
+            await finalize_run(db, run, "completed")
+            await db.commit()
+            return AnswerOut(answer="当前知识库中没有可用于回答该问题的已索引证据。", citations=[])
+
+        evidence: list[tuple[str, DocumentChunk, Document, DocumentVersion, float]] = []
+        for chunk, document, version, score in hits:
+            label = f"S{len(evidence) + 1}"
+            evidence.append((label, chunk, document, version, score))
+
+        sources = [
+            f"[{label}] 文件：{version.original_name}；"
+            f"页码：{chunk.page_number or '无'}；内容：{chunk.content}"
+            for label, chunk, _, version, _ in evidence
+        ]
+        usage = {}
+        answer = await gateway.answer_with_context(question, sources, usage=usage)
+        await add_step(
+            db, run, "generate", status="completed",
+            input_summary=f"基于 {len(sources)} 条证据生成回答",
+            output_summary=answer[:500],
+            latency_ms=0,
+        )
+        await finalize_run(
+            db, run, "completed",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+        )
+        await db.commit()
+        cited_labels = set(re.findall(r"\[S(\d+)\]", answer))
+        citations = [
+            CitationOut(
+                label=label,
+                chunk_id=chunk.id,
+                document_id=document.id,
+                original_name=version.original_name,
+                page_number=chunk.page_number,
+                position=chunk.position,
+                content=chunk.content,
+                score=score,
+            )
+            for label, chunk, document, version, score in evidence
+            if label.removeprefix("S") in cited_labels
+        ]
+        return AnswerOut(answer=answer, citations=citations)
+    except (AIServiceError, VectorStoreError) as error:
+        await finalize_run(db, run, "failed", error_code=str(error)[:500])
+        await db.commit()
+        raise

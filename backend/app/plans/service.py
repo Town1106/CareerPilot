@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import DASHSCOPE_CHAT_MODEL
 from app.interviews.models import CompetencyMemory
 from app.jobs.models import Competency
 from app.jobs.service import competency_gap, normalize_competency
@@ -12,6 +13,7 @@ from app.plans.models import StudyPlan, StudyTask
 from app.plans.schemas import PlanOut, TaskOut
 from app.rag import gateway
 from app.rag.gateway import AIServiceError
+from app.traces.service import add_step, create_run, finalize_run
 from app.workspaces.models import Workspace
 
 
@@ -116,6 +118,8 @@ async def generate_plan(
     ]
 
     total_days = (end_date - start_date).days + 1
+    run = await create_run(db, workspace.id, "plan_generate", DASHSCOPE_CHAT_MODEL)
+    usage = {}
     try:
         payload = await gateway.structured_chat(
             (
@@ -137,12 +141,15 @@ async def generate_plan(
                 },
                 ensure_ascii=False,
             ),
+            usage=usage,
         )
     except AIServiceError:
+        await finalize_run(db, run, "failed", error_code="学习计划生成失败")
         raise PlanError("学习计划生成失败，请稍后重试")
 
     raw_tasks = payload.get("tasks") if isinstance(payload, dict) else None
     if not isinstance(raw_tasks, list) or not raw_tasks:
+        await finalize_run(db, run, "failed", error_code="学习计划生成结果为空")
         raise PlanError("学习计划生成结果为空")
 
     task_date_base = start_date
@@ -187,6 +194,16 @@ async def generate_plan(
                 priority=min(10, max(0, int(priority))),
             )
         )
+    await add_step(
+        db, run, "generate", status="completed",
+        input_summary=f"为 {len(gap_items)} 项能力差距生成任务",
+        output_summary=f"生成 {len(raw_tasks)} 个任务",
+    )
+    await finalize_run(
+        db, run, "completed",
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+    )
     await db.commit()
     await db.refresh(plan)
     return await get_plan(db, plan)

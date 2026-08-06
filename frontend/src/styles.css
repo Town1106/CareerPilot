@@ -1387,3 +1387,170 @@ button.small {
     width: 100%;
   }
 }
+
+/* ---------- Traces ---------- */
+.trace-list {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.trace-card {
+  border: 1px solid #d9d5c8;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.trace-card.failed {
+  border-left: 4px solid #9c3e36;
+}
+
+.trace-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.trace-summary:hover {
+  background: #f9f7f2;
+}
+
+.trace-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trace-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.82rem;
+  color: #7c847f;
+}
+
+.trace-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.trace-badge.completed {
+  background: #e0ede4;
+  color: #2d7a4e;
+}
+
+.trace-badge.failed {
+  background: #f4e2df;
+  color: #9c3e36;
+}
+
+.trace-badge.small {
+  padding: 2px 8px;
+  font-size: 0.68rem;
+}
+
+.trace-type {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.trace-tokens {
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  font-size: 0.78rem;
+  color: #5f6b65;
+}
+
+.trace-expand {
+  color: #afb4af;
+  font-size: 0.7rem;
+}
+
+.trace-error {
+  padding: 10px 20px 14px;
+  color: #9c3e36;
+  font-size: 0.82rem;
+  background: #fdf6f5;
+}
+
+.trace-detail {
+  padding: 0 20px 20px;
+  border-top: 1px solid #e8e4d8;
+}
+
+.trace-meta {
+  display: flex;
+  gap: 18px;
+  padding: 14px 0;
+  font-size: 0.8rem;
+  color: #5f6b65;
+  border-bottom: 1px solid #f0ede5;
+  flex-wrap: wrap;
+}
+
+.trace-step {
+  padding: 14px 0;
+  border-bottom: 1px solid #f0ede5;
+}
+
+.trace-step:last-child {
+  border-bottom: 0;
+}
+
+.trace-step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.trace-step-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.trace-step-time {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #7c847f;
+}
+
+.trace-step-body {
+  margin: 6px 0 0 0;
+  font-size: 0.82rem;
+  color: #5f6b65;
+  line-height: 1.6;
+}
+
+.trace-label {
+  font-weight: 600;
+  color: #3a4a40;
+}
+
+.trace-chunks {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.78rem;
+}
+
+.trace-chunks li {
+  margin-bottom: 4px;
+  color: #7c847f;
+  word-break: break-all;
+}
+
+.trace-step-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fdf6f5;
+  color: #9c3e36;
+  font-size: 0.82rem;
+}

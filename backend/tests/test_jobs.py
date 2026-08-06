@@ -46,7 +46,7 @@ def test_extract_requirements_tolerates_large_agent_jd_output(monkeypatch) -> No
         ]
     )
 
-    async def fake_structured(_: str, __: str) -> dict:
+    async def fake_structured(_: str, __: str, **__kwargs: object) -> dict:
         return {"requirements": valid}
 
     monkeypatch.setattr(gateway, "structured_chat", fake_structured)
@@ -58,7 +58,7 @@ def test_extract_requirements_tolerates_large_agent_jd_output(monkeypatch) -> No
 
 
 def test_extract_requirements_reports_specific_invalid_reason(monkeypatch) -> None:
-    async def fake_structured(_: str, __: str) -> dict:
+    async def fake_structured(_: str, __: str, **__kwargs: object) -> dict:
         return {
             "requirements": [
                 {
@@ -155,7 +155,7 @@ def fake_ai(monkeypatch):
     async def fake_embeddings(texts: list[str]) -> list[list[float]]:
         return [[1.0] + [0.0] * 1023 for _ in texts]
 
-    async def fake_structured(system: str, prompt: str) -> dict:
+    async def fake_structured(system: str, prompt: str, **__kwargs: object) -> dict:
         if "JD 结构化" in system:
             if "第二个岗位" in prompt:
                 return {
@@ -285,7 +285,7 @@ def test_job_analysis_gap_and_comparison(client: TestClient, fake_ai) -> None:
 def test_job_analysis_rejects_invalid_model_output(client: TestClient, monkeypatch) -> None:
     workspace_id = create_workspace(client)
 
-    async def invalid_structured(_: str, __: str) -> dict:
+    async def invalid_structured(_: str, __: str, **__kwargs: object) -> dict:
         return {"requirements": []}
 
     monkeypatch.setattr(gateway, "structured_chat", invalid_structured)

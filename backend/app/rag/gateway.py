@@ -28,6 +28,14 @@ def _error_message(response: httpx.Response) -> str:
         return f"百炼请求失败（HTTP {response.status_code}）"
 
 
+def _extract_usage(body: dict) -> dict[str, int]:
+    usage = body.get("usage", {})
+    return {
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+    }
+
+
 async def _post(client: httpx.AsyncClient, path: str, payload: dict) -> dict:
     try:
         response = await client.post(path, json=payload)
@@ -71,7 +79,9 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     return vectors
 
 
-async def answer_with_context(question: str, sources: list[str]) -> str:
+async def answer_with_context(
+    question: str, sources: list[str], usage: dict | None = None
+) -> str:
     if not DASHSCOPE_API_KEY:
         raise AIServiceError("未配置 DASHSCOPE_API_KEY")
     evidence = "\n\n".join(sources)
@@ -104,6 +114,8 @@ async def answer_with_context(question: str, sources: list[str]) -> str:
                 "max_tokens": 1200,
             },
         )
+    if usage is not None:
+        usage.update(_extract_usage(body))
     try:
         answer = body["choices"][0]["message"].get("content", "").strip()
     except (KeyError, IndexError, TypeError) as error:
@@ -113,7 +125,9 @@ async def answer_with_context(question: str, sources: list[str]) -> str:
     return answer
 
 
-async def structured_chat(system: str, prompt: str) -> dict:
+async def structured_chat(
+    system: str, prompt: str, usage: dict | None = None
+) -> dict:
     if not DASHSCOPE_API_KEY:
         raise AIServiceError("未配置 DASHSCOPE_API_KEY")
     async with httpx.AsyncClient(
@@ -136,6 +150,8 @@ async def structured_chat(system: str, prompt: str) -> dict:
                 "max_tokens": 4000,
             },
         )
+    if usage is not None:
+        usage.update(_extract_usage(body))
     try:
         content = body["choices"][0]["message"]["content"].strip()
         return json.loads(content)
@@ -149,6 +165,7 @@ async def web_search_interview_questions(
     wanted_count: int,
     interview_type: str,
     excluded_questions: list[str],
+    usage: dict | None = None,
 ) -> tuple[str, list[str]]:
     stage_hint = "不限面试环节" if interview_type == "mixed" else interview_type
     excluded = "\n".join(f"- {question}" for question in excluded_questions[-100:])
@@ -181,6 +198,8 @@ async def web_search_interview_questions(
                 "store": False,
             },
         )
+    if usage is not None:
+        usage.update(_extract_usage(body))
     text_parts = []
     sources = []
     try:

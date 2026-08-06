@@ -138,7 +138,7 @@ def test_index_and_cited_question(client: TestClient, monkeypatch) -> None:
     async def fake_embeddings(texts: list[str]) -> list[list[float]]:
         return [[1.0] + [0.0] * 1023 for _ in texts]
 
-    async def fake_answer(question: str, sources: list[str]) -> str:
+    async def fake_answer(question: str, sources: list[str], **__kwargs: object) -> str:
         assert question == "这个项目使用什么后端框架？"
         assert "Django" in sources[0]
         assert "FastAPI" not in sources[0]

@@ -18,7 +18,7 @@ def create_analyzed_job(client: TestClient, monkeypatch) -> tuple[str, str]:
         json={"name": "模拟面试", "target_role": "Java 后端"},
     ).json()
 
-    async def extract(system: str, _: str) -> dict:
+    async def extract(system: str, _: str, **__kwargs: object) -> dict:
         assert "JD 结构化抽取器" in system
         return {
             "requirements": [
@@ -55,7 +55,7 @@ def test_interview_resume_report_and_memory(client: TestClient, monkeypatch) -> 
     workspace_id, job_id = create_analyzed_job(client, monkeypatch)
     question_number = 0
 
-    async def interview_ai(system: str, prompt: str) -> dict:
+    async def interview_ai(system: str, prompt: str, **__kwargs: object) -> dict:
         nonlocal question_number
         if "模拟面试官" in system:
             question_number += 1
