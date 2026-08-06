@@ -8,6 +8,8 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
+import sys
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,13 +36,24 @@ class StdioMCPClient:
         return self._connected
 
     async def connect(self) -> None:
-        self._process = await asyncio.create_subprocess_exec(
-            *self._command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, **(self._env or {})},
-        )
+        if sys.platform == "win32":
+            # Windows: npx/npm are .cmd files, need shell mode
+            cmd = subprocess.list2cmdline(self._command)
+            self._process = await asyncio.create_subprocess_shell(
+                cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, **(self._env or {})},
+            )
+        else:
+            self._process = await asyncio.create_subprocess_exec(
+                *self._command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, **(self._env or {})},
+            )
         try:
             result = await self._request("initialize", {
                 "protocolVersion": "2024-11-05",

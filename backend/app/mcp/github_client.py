@@ -111,7 +111,7 @@ class GitHubMCPClient(MCPClient):
                 self._connected = True
                 logger.info("GitHub MCP protocol connected, %d tools available", len(self._mcp.tools))
                 return
-            except (MCPProtocolError, FileNotFoundError, OSError) as e:
+            except (MCPProtocolError, FileNotFoundError, OSError, NotImplementedError) as e:
                 logger.warning("MCP protocol failed (%s), falling back to HTTP", e)
                 self._mcp = None
                 self._use_mcp = False
