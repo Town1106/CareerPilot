@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/LangGraph-✓-1C3C3C?logo=langchain&logoColor=white" alt="LangGraph">
   <img src="https://img.shields.io/badge/Qdrant-✓-DC244C?logo=qdrant&logoColor=white" alt="Qdrant">
-  <img src="https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 17">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License MIT">
 </p>
 
@@ -28,7 +28,7 @@ CareerPilot 是一个面向软件开发者的求职准备平台，通过 **RAG �
 | 润色简历，可能编造经历 | 从用户真实项目资料中提取证据，引用原文 |
 | 固定题库随机播放 | 根据目标 JD 缺口动态生成追问 |
 | 每次对话独立，无法追踪 | 长期记录薄弱知识点，动态调整学习计划 |
-| 回答无引用依据 | 所有关键结论附带页码和原文引用 |
+| 回答无引用依据 | RAG 回答与 JD 覆盖结论必须关联可核验原文 |
 | 无执行过程观测 | 完整 Agent 执行轨迹，记录 Token 用量和延迟 |
 
 ### 核心闭环
@@ -49,15 +49,15 @@ CareerPilot 是一个面向软件开发者的求职准备平台，通过 **RAG �
 | **知识库管理** | 上传 PDF/DOCX/TXT/Markdown，SHA-256 去重，版本管理，自动向量化索引 |
 | **RAG 问答** | Dense + Sparse + RRF 混合检索，带页码级引用 `[S1]` 的证据回答 |
 | **JD 能力差距分析** | 结构化抽取岗位要求，原子化归一，RAG 证据匹配，加权覆盖率计算 |
-| **公司面经检索** | 百炼联网搜索公开面经，来源白名单校验，7 天缓存，支持真实/混合题库 |
+| **公司面经检索** | 百炼联网搜索公开面经，来源白名单校验，按工作空间、公司和岗位持久化复用题库 |
 | **模拟面试** | 基于 JD 缺口 + 公司面经的动态追问，独立评分报告，能力记忆沉淀 |
 | **学习计划** | LLM 自动生成每日任务，根据面试表现动态调整优先级 |
 | **运行轨迹** | 每次 AI 操作的完整记录：节点时间线、Token 用量、检索 Chunk |
 | **Skill 注册中心** | 可版本化 Skill 定义，约束触发条件、输入和允许工具 |
-| **Tool Policy 引擎** | 工具注册、风险分级、审批策略，写操作需用户批准 |
+| **Tool Policy 引擎** | 工具注册、风险分级和审批审计；GitHub 导入及 Calendar 写操作强制确认 |
 | **GitHub MCP** | 连接仓库，浏览 README/Commits，导入知识库，提取项目事实 |
 | **Calendar MCP** | 学习计划任务一键同步到日历 |
-| **LangGraph 状态机** | 多节点 Agent 工作流，条件路由，SSE 实时推送 |
+| **LangGraph Harness** | 受控单节点图复用现有 Service，通过 SSE 推送开始、完成和错误事件 |
 | **简历一致性校验** | 提取 GitHub 项目事实，与简历内容比对，输出匹配/缺失/矛盾报告 |
 
 ---
@@ -90,7 +90,7 @@ CareerPilot 是一个面向软件开发者的求职准备平台，通过 **RAG �
 ├─────────────────────────────────────────────────────────┤
 │                  Data Layer                              │
 │  ┌────────────────┐  ┌──────────────────────────────┐  │
-│  │ PostgreSQL 18  │  │ Qdrant (Local)               │  │
+│  │ PostgreSQL 17  │  │ Qdrant (Local)               │  │
 │  │ 业务事实来源    │  │ Dense + Sparse 向量检索      │  │
 │  └────────────────┘  └──────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────┤
@@ -104,26 +104,13 @@ CareerPilot 是一个面向软件开发者的求职准备平台，通过 **RAG �
 └─────────────────────────────────────────────────────────┘
 ```
 
-### LangGraph 工作流（以 JD 分析为例）
+### Agent Harness 与 JD 业务流程
 
 ```
-        ┌──────────┐
-        │  extract  │  结构化抽取 JD 要求
-        └────┬─────┘
-             ▼
-        ┌──────────┐
-        │ normalize │  别名归一化、原子化拆分
-        └────┬─────┘
-             ▼
-        ┌──────────────┐
-        │retrieve_evidence│  为每项要求检索知识库证据
-        └──────┬───────┘
-               ▼
-        ┌──────────┐
-        │  judge   │  LLM 核验覆盖度（covered/partial/uncovered/conflict）
-        └────┬─────┘
-             ▼
-           END
+Agent SSE：权限校验 → 按 skill_name 选择执行节点 → 复用业务 Service → 返回完整 output
+
+JD Service：结构化抽取 → 原子化与别名归一 → 逐项检索证据
+          → LLM 判断覆盖度 → 代码校验证据标签 → 持久化分析结果
 ```
 
 ---
@@ -132,7 +119,7 @@ CareerPilot 是一个面向软件开发者的求职准备平台，通过 **RAG �
 
 ### 环境要求
 
-- Python 3.12+
+- Python 3.12
 - Node.js 20+
 - PostgreSQL 16+（或使用 SQLite 开发）
 - 百炼 API Key（[申请地址](https://bailian.console.aliyun.com/)）
@@ -147,14 +134,14 @@ cd CareerPilot
 ### 2. 配置环境变量
 
 ```bash
-cp .env.example .env
+cp .env.example backend/.env
 ```
 
 编辑 `.env`，填入必要配置：
 
 ```ini
 # 数据库（默认使用 SQLite，无需配置；PostgreSQL 按需启用）
-DATABASE_URL=postgresql+asyncpg://user:password@127.0.0.1:5432/careerpilot
+DATABASE_URL=postgresql+asyncpg://careerpilot:careerpilot@127.0.0.1:5433/careerpilot
 
 # 百炼 API（必填）
 DASHSCOPE_API_KEY=sk-your-api-key
@@ -163,6 +150,8 @@ DASHSCOPE_EMBEDDING_MODEL=qwen3.7-text-embedding
 
 # GitHub 集成（可选）
 GITHUB_TOKEN=github_pat_xxx
+# 配置后优先使用标准 MCP；留空时回退到 GitHub REST API
+GITHUB_MCP_COMMAND=
 
 # Calendar MCP（可选，留空使用 Mock 模式）
 CALENDAR_MCP_COMMAND=
@@ -217,7 +206,7 @@ CareerPilot/
 │   │   ├── plans/           # 学习计划生成与任务管理
 │   │   ├── rag/             # 百炼网关、Qdrant 索引、Dense+Sparse 检索
 │   │   ├── skills/          # Skill 注册中心 + 6 个 Skill Manifest
-│   │   ├── tools/           # Tool Registry + Policy Engine + 审批队列
+│   │   ├── tools/           # Tool Registry + 9 个 Manifest + Policy Engine
 │   │   ├── traces/          # Agent 执行轨迹记录
 │   │   ├── workspaces/      # 工作空间 CRUD
 │   │   └── main.py          # FastAPI 应用入口
@@ -236,15 +225,14 @@ CareerPilot/
 │   │   │   ├── traces/      # 运行轨迹
 │   │   │   ├── skills/      # 技能中心
 │   │   │   ├── tools/       # 工具中心
-│   │   │   ├── github/      # GitHub 集成
-│   │   │   └── analysis/    # 项目分析
+│   │   │   └── github/      # GitHub 集成与项目一致性分析
 │   │   ├── api.ts           # 共享 API 请求层
 │   │   ├── types.ts         # 共享类型定义
 │   │   └── App.tsx          # 根组件
 │   ├── vite.config.ts
 │   └── package.json
 ├── .env.example              # 环境变量模板
-├── 开发文档.md               # 完整开发文档（中文）
+├── 代码阅读与技术实现说明.md  # 当前代码阅读顺序与完整技术实现
 └── README.md
 ```
 
@@ -266,6 +254,8 @@ cd frontend
 npm run build                     # 生产构建
 ```
 
+当前验证结果：后端 25 个测试通过，Ruff 检查通过，前端 TypeScript 与 Vite 生产构建通过。
+
 ---
 
 ## 演示数据
@@ -281,7 +271,7 @@ uv run python -m app.scripts.demo_data
 
 | 数据 | 数量 |
 |------|------|
-| 演示账号 | 1 个（demo@careerpilot.dev / demo123） |
+| 演示账号 | 1 个（demo@careerpilot.dev / demo1234） |
 | 工作空间 | 1 个 |
 | 简历文档 | 2 份（已索引） |
 | JD | 2 个（已分析） |
@@ -313,7 +303,7 @@ uv run python -m app.scripts.demo_data
 
 - **框架**: FastAPI (async)
 - **Agent**: LangGraph (StateGraph + SSE)
-- **数据库**: PostgreSQL 18 + SQLAlchemy 2.0 (async)
+- **数据库**: PostgreSQL 17 + SQLAlchemy 2.0 (async)，开发环境兼容 SQLite
 - **迁移**: Alembic
 - **向量检索**: Qdrant Local (Dense + Sparse + RRF)
 - **AI**: 百炼 DashScope (Qwen 3.7)
@@ -340,10 +330,16 @@ uv run python -m app.scripts.demo_data
 | 架构模式 | 模块化单体 | 单开发者可维护，无微服务开销 |
 | 向量数据库 | Qdrant | 本地零配置启动，原生支持 Hybrid Search |
 | 事实来源 | PostgreSQL | 文档和业务数据以 PG 为准，向量仅可重建索引 |
-| Agent 编排 | LangGraph | 受控状态图，支持条件路由、中断审批、持久化 |
+| Agent 编排 | LangGraph | 受控单节点图统一复用业务 Service，避免维护两套实现 |
 | 事件推送 | SSE | 相比 WebSocket 更轻量，单向推送 Agent 事件 |
 | 外部工具 | MCP | GitHub/Calendar 等独立边界通过 MCP 接入 |
-| 写操作 | 强制审批 | 所有外部写操作需用户确认后执行 |
+| 写操作 | 策略审批 | GitHub 导入和 Calendar 创建/删除需确认并记录审批状态 |
+
+### 当前边界
+
+- Skill Manifest 当前用于注册和展示元数据，尚未自动选择 Skill 或强制执行工具白名单。
+- 前端业务页目前调用 REST API；Agent SSE 端点已提供，但尚未接入页面。
+- Qdrant Local 面向单进程开发部署；多 Worker 部署应切换到独立 Qdrant Server。
 
 ---
 

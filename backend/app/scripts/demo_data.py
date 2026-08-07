@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 ph = PasswordHasher()
 
 DEMO_EMAIL = "demo@careerpilot.dev"
-DEMO_PASSWORD = "demo123"
+DEMO_PASSWORD = "demo1234"
 DEMO_WS_NAME = "\u6c42\u804c\u51c6\u5907"
 
 # ── 简历文档内容 ──
