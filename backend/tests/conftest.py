@@ -1,19 +1,18 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.rag.store import close_client
 
-test_engine = create_async_engine(
-    "sqlite+aiosqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+TEST_DB = Path(__file__).resolve().parent / ".pytest-careerpilot.db"
+test_engine = create_async_engine(f"sqlite+aiosqlite:///{TEST_DB}", poolclass=NullPool)
 TestSession = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
@@ -34,9 +33,23 @@ def clean_database() -> Iterator[None]:
     yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_test_engine() -> Iterator[None]:
+    yield
+    close_client()
+    asyncio.run(test_engine.dispose())
+    TEST_DB.unlink(missing_ok=True)
+
+
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = override_db
-    with TestClient(app) as test_client:
-        yield test_client
+    test_client = TestClient(app)
+    yield test_client
+    test_client.close()
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_session_factory():
+    return TestSession

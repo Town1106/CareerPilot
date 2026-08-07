@@ -14,6 +14,7 @@ from app.jobs.schemas import (
     AnalysisOut,
     CompareOut,
     CompetencyComparison,
+    EvidenceJudgment,
     EvidenceOut,
     ExtractedRequirement,
     ExtractionResult,
@@ -200,6 +201,42 @@ async def judge_evidence(
         raise AIServiceError("证据判断结果未通过校验") from error
 
 
+def enforce_evidence_links(
+    drafts: list[dict], result: JudgmentResult
+) -> JudgmentResult:
+    """只保留属于当前要求的证据标签，避免无证据的覆盖结论。"""
+    allowed = {
+        draft["index"]: {candidate["label"] for candidate in draft["candidates"]}
+        for draft in drafts
+    }
+    judgments: list[EvidenceJudgment] = []
+    seen: set[int] = set()
+    for judgment in result.judgments:
+        index = judgment.requirement_index
+        if index not in allowed or index in seen:
+            continue
+        seen.add(index)
+        labels = list(dict.fromkeys(
+            label for label in judgment.evidence_labels if label in allowed[index]
+        ))
+        if judgment.coverage == "uncovered":
+            labels = []
+        if judgment.coverage != "uncovered" and not labels:
+            judgments.append(
+                judgment.model_copy(
+                    update={
+                        "coverage": "uncovered",
+                        "confidence": 0.0,
+                        "explanation": "模型未提供可核验的有效证据，已降级为未覆盖。",
+                        "evidence_labels": [],
+                    }
+                )
+            )
+        else:
+            judgments.append(judgment.model_copy(update={"evidence_labels": labels}))
+    return JudgmentResult(judgments=judgments)
+
+
 async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
     job.status = "analyzing"
     job.analysis_error = None
@@ -207,6 +244,7 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
     raw_output = None
     run = await create_run(db, job.workspace_id, "jd_analysis", DASHSCOPE_CHAT_MODEL)
     try:
+        extraction_started = utc_now()
         extraction_usage = {}
         extraction, raw_output = await extract_requirements(job.raw_text, usage=extraction_usage)
         job.analysis_raw_output = raw_output
@@ -214,11 +252,13 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
             db, run, "extract_requirements", status="completed",
             input_summary=f"JD 原文 {len(job.raw_text)} 字符",
             output_summary=f"抽取 {len(extraction.requirements)} 项要求",
+            started_at=extraction_started,
         )
         extracted_items = atomic_requirements(extraction)
         drafts = []
         candidate_by_label = {}
         chunk_records = []
+        retrieval_started = utc_now()
         for index, item in enumerate(extracted_items):
             hits = await retrieve_chunks(
                 db, job.workspace_id, f"{item.name}；{item.raw_evidence}", limit=3
@@ -254,17 +294,21 @@ async def analyze_job(db: AsyncSession, job: JobDescription) -> AnalysisOut:
             db, run, "retrieve_evidence", status="completed",
             input_summary=f"为 {len(extracted_items)} 项要求检索证据",
             retrieved_chunks=chunk_records,
+            started_at=retrieval_started,
         )
+        judgment_started = utc_now()
         judgment_usage = {}
         judgments = (
             await judge_evidence(drafts, usage=judgment_usage)
             if any(draft["candidates"] for draft in drafts)
             else JudgmentResult(judgments=[])
         )
+        judgments = enforce_evidence_links(drafts, judgments)
         await add_step(
             db, run, "judge_evidence", status="completed",
             input_summary=f"核验 {len(judgments.judgments)} 项证据",
             output_summary=f"覆盖 {sum(1 for j in judgments.judgments if j.coverage == 'covered')} 项",
+            started_at=judgment_started,
         )
         judgment_by_index = {
             judgment.requirement_index: judgment

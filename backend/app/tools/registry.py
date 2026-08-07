@@ -65,6 +65,13 @@ class ToolRegistry:
                     )
                 )
                 added += 1
+            else:
+                existing.version = manifest["version"]
+                existing.description = manifest["description"]
+                existing.manifest_path = manifest["_path"]
+                existing.risk_level = manifest["risk_level"]
+                existing.input_schema = json.dumps(manifest.get("input_schema"))
+                existing.output_schema = json.dumps(manifest.get("output_schema"))
 
             # 确保策略存在
             policy = await db.scalar(
@@ -79,6 +86,10 @@ class ToolRegistry:
                         approval_prompt=self._default_prompt(manifest) if risk != "R0" else None,
                     )
                 )
+            else:
+                risk = manifest["risk_level"]
+                policy.require_approval = risk != "R0"
+                policy.approval_prompt = self._default_prompt(manifest) if risk != "R0" else None
 
         if added:
             await db.flush()

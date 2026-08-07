@@ -1,0 +1,10 @@
+name: calendar-event-create
+version: 1.0.0
+description: 在外部日历中创建学习事件
+risk_level: R2
+input_schema:
+  workspace_id: uuid
+  title: string
+  date: date
+output_schema:
+  event_id: string

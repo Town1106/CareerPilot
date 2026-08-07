@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import DASHSCOPE_CHAT_MODEL
+from app.core.database import utc_now
 from app.interviews.models import CompetencyMemory
 from app.jobs.models import Competency
 from app.jobs.service import competency_gap, normalize_competency
@@ -78,6 +79,13 @@ async def get_plan(db: AsyncSession, plan: StudyPlan) -> PlanOut:
 async def generate_plan(
     db: AsyncSession, workspace: Workspace, start_date: date, end_date: date, daily_minutes: int
 ) -> PlanOut:
+    if await db.scalar(
+        select(StudyPlan.id).where(
+            StudyPlan.workspace_id == workspace.id,
+            StudyPlan.status == "active",
+        )
+    ):
+        raise PlanError("当前已有进行中的学习计划，请先归档再创建")
     plan = StudyPlan(
         workspace_id=workspace.id,
         goal=f"从 {start_date} 到 {end_date} 备战 {workspace.target_role or '目标岗位'}",
@@ -120,11 +128,13 @@ async def generate_plan(
     total_days = (end_date - start_date).days + 1
     run = await create_run(db, workspace.id, "plan_generate", DASHSCOPE_CHAT_MODEL)
     usage = {}
+    generation_started = utc_now()
     try:
         payload = await gateway.structured_chat(
             (
                 "你是学习计划生成器。根据用户的能力差距、面试表现和可用时间，生成每日学习任务。"
-                "返回 JSON 对象 tasks，每项包含 title（任务标题）、description（具体学习内容）、"
+                "返回 JSON 对象 tasks，每项包含 competency_name（必须取自 gaps 中的 competency）、"
+                "title（任务标题）、description（具体学习内容）、"
                 "scheduled_date（ISO 日期）、duration_minutes（分钟）、priority（0-10 整数，越大越优先）。"
                 "每天的任务总时长不超过 daily_minutes。优先安排未覆盖和部分覆盖的能力。"
                 "每个能力只安排 1-2 个任务，不要重复。确保覆盖所有差距项。"
@@ -153,6 +163,8 @@ async def generate_plan(
         raise PlanError("学习计划生成结果为空")
 
     task_date_base = start_date
+    used_minutes: dict[date, int] = {}
+    valid_task_count = 0
     for index, item in enumerate(raw_tasks):
         if not isinstance(item, dict):
             continue
@@ -176,13 +188,24 @@ async def generate_plan(
         if not isinstance(priority, (int, float)):
             priority = 0
 
-        competency_name = normalize_competency(str(title))
+        competency_value = item.get("competency_name")
+        competency_name = (
+            normalize_competency(competency_value)
+            if isinstance(competency_value, str)
+            else ""
+        )
         competency = await db.scalar(
             select(Competency).where(
                 Competency.workspace_id == workspace.id,
                 Competency.canonical_name == competency_name,
             )
         )
+        duration = min(480, max(15, int(duration)))
+        remaining = daily_minutes - used_minutes.get(scheduled_date, 0)
+        if remaining < 15:
+            continue
+        duration = min(duration, remaining)
+        used_minutes[scheduled_date] = used_minutes.get(scheduled_date, 0) + duration
         db.add(
             StudyTask(
                 plan_id=plan.id,
@@ -190,14 +213,19 @@ async def generate_plan(
                 title=str(title)[:200],
                 description=str(description)[:2000],
                 scheduled_date=scheduled_date,
-                duration_minutes=min(480, max(15, int(duration))),
+                duration_minutes=duration,
                 priority=min(10, max(0, int(priority))),
             )
         )
+        valid_task_count += 1
+    if not valid_task_count:
+        await finalize_run(db, run, "failed", error_code="学习计划没有可用任务")
+        raise PlanError("学习计划没有可用任务")
     await add_step(
         db, run, "generate", status="completed",
         input_summary=f"为 {len(gap_items)} 项能力差距生成任务",
-        output_summary=f"生成 {len(raw_tasks)} 个任务",
+        output_summary=f"生成 {valid_task_count} 个任务",
+        started_at=generation_started,
     )
     await finalize_run(
         db, run, "completed",

@@ -67,6 +67,7 @@ export function DocumentsView({ workspace, onBack, onJobs }: { workspace: Worksp
       try {
         const doc = await api<Document>("/api/v1/mcp/github/import", {
           method: "POST",
+          headers: { "X-User-Confirmed": "true" },
           body: JSON.stringify({ workspace_id: workspace.id, repo_full_name: selectedRepo }),
         });
         if (doc.id) {

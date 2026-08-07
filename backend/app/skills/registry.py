@@ -62,6 +62,11 @@ class SkillRegistry:
                     )
                 )
                 added += 1
+            else:
+                existing.version = manifest["version"]
+                existing.description = manifest["description"]
+                existing.manifest_path = manifest["_path"]
+                existing.risk_level = manifest["risk_level"]
         if added:
             await db.flush()
             logger.info("Synced %d new skill(s) to database", added)

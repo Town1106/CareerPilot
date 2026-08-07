@@ -16,7 +16,7 @@ class ProjectFact(Base):
         Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     repo_full_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    extracted_tech_stack: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    extracted_tech_stack: Mapped[list | None] = mapped_column(JSON, nullable=True)
     extracted_summary: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     extracted_role: Mapped[str | None] = mapped_column(String(200), nullable=True)
     commit_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -31,8 +31,8 @@ class ConsistencyReport(Base):
         Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     repo_full_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    matched_items: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    missing_in_resume: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    conflicts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    matched_items: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    missing_in_resume: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    conflicts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     overall_score: Mapped[float] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

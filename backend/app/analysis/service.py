@@ -9,6 +9,7 @@ from app.analysis.schemas import FactOut, ReportOut
 from app.documents.models import Document, DocumentChunk, DocumentVersion
 from app.mcp.github_client import get_github_client
 from app.rag.gateway import AIServiceError, structured_chat
+from app.workspaces.models import Workspace
 
 EXTRACT_SYSTEM = (
     "你是技术项目分析专家。从 GitHub 仓库信息中提取结构化事实。"
@@ -67,6 +68,11 @@ async def extract_facts(
     client = get_github_client()
     if not client.connected:
         raise RuntimeError("GitHub 未连接")
+    owner_id = await db.scalar(select(Workspace.user_id).where(Workspace.id == workspace_id))
+    try:
+        client.require_owner(str(owner_id))
+    except PermissionError as error:
+        raise RuntimeError(str(error)) from error
 
     owner, repo = repo_full_name.split("/")
     repo_data = await client.get_repo(owner, repo)
@@ -99,16 +105,19 @@ async def extract_facts(
     except AIServiceError as e:
         raise RuntimeError(f"AI 分析失败: {e}") from e
 
+    tech_stack = result.get("tech_stack", [])
+    if not isinstance(tech_stack, list):
+        tech_stack = []
     facts = ProjectFact(
         workspace_id=workspace_id,
         repo_full_name=repo_full_name,
-        extracted_tech_stack=result.get("tech_stack", []),
+        extracted_tech_stack=[str(item)[:120] for item in tech_stack[:50]],
         extracted_summary=result.get("summary", ""),
         extracted_role=result.get("role", ""),
         commit_count=len(commits_data),
     )
     db.add(facts)
-    await db.flush()
+    await db.commit()
     await db.refresh(facts)
     return FactOut.model_validate(facts)
 
@@ -146,6 +155,7 @@ async def check_consistency(
             .join(Document, Document.active_version_id == DocumentVersion.id)
             .where(
                 Document.workspace_id == workspace_id,
+                Document.category == "resume",
                 DocumentVersion.status == "indexed",
             )
             .order_by(DocumentChunk.position)
@@ -170,16 +180,23 @@ async def check_consistency(
     except AIServiceError as e:
         raise RuntimeError(f"AI 分析失败: {e}") from e
 
+    matched = result.get("matched_items", [])
+    missing = result.get("missing_in_resume", [])
+    conflicts = result.get("conflicts", [])
+    try:
+        overall_score = min(100, max(0, float(result.get("overall_score", 0))))
+    except (TypeError, ValueError):
+        overall_score = 0
     report = ConsistencyReport(
         workspace_id=workspace_id,
         repo_full_name=repo_full_name,
-        matched_items=result.get("matched_items", []),
-        missing_in_resume=result.get("missing_in_resume", []),
-        conflicts=result.get("conflicts", []),
-        overall_score=float(result.get("overall_score", 0)),
+        matched_items=matched if isinstance(matched, list) else [],
+        missing_in_resume=missing if isinstance(missing, list) else [],
+        conflicts=conflicts if isinstance(conflicts, list) else [],
+        overall_score=overall_score,
     )
     db.add(report)
-    await db.flush()
+    await db.commit()
     await db.refresh(report)
     return ReportOut.model_validate(report)
 

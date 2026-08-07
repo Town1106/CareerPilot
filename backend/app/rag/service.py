@@ -99,6 +99,7 @@ async def answer_question(
 ) -> AnswerOut:
     run = await create_run(db, workspace_id, "rag_qa", DASHSCOPE_CHAT_MODEL)
     try:
+        retrieve_started = utc_now()
         hits = await retrieve_chunks(db, workspace_id, question)
         chunk_records = [
             {
@@ -113,7 +114,7 @@ async def answer_question(
             db, run, "retrieve", status="completed",
             input_summary=question[:500],
             retrieved_chunks=chunk_records,
-            latency_ms=0,
+            started_at=retrieve_started,
         )
         if not hits:
             await finalize_run(db, run, "completed")
@@ -131,20 +132,12 @@ async def answer_question(
             for label, chunk, _, version, _ in evidence
         ]
         usage = {}
+        generate_started = utc_now()
         answer = await gateway.answer_with_context(question, sources, usage=usage)
-        await add_step(
-            db, run, "generate", status="completed",
-            input_summary=f"基于 {len(sources)} 条证据生成回答",
-            output_summary=answer[:500],
-            latency_ms=0,
-        )
-        await finalize_run(
-            db, run, "completed",
-            prompt_tokens=usage.get("prompt_tokens", 0),
-            completion_tokens=usage.get("completion_tokens", 0),
-        )
-        await db.commit()
         cited_labels = set(re.findall(r"\[S(\d+)\]", answer))
+        valid_labels = {label.removeprefix("S") for label, *_ in evidence}
+        if not cited_labels or not cited_labels.issubset(valid_labels):
+            raise AIServiceError("回答缺少有效证据引用")
         citations = [
             CitationOut(
                 label=label,
@@ -159,6 +152,18 @@ async def answer_question(
             for label, chunk, document, version, score in evidence
             if label.removeprefix("S") in cited_labels
         ]
+        await add_step(
+            db, run, "generate", status="completed",
+            input_summary=f"基于 {len(sources)} 条证据生成回答",
+            output_summary=answer[:500],
+            started_at=generate_started,
+        )
+        await finalize_run(
+            db, run, "completed",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+        )
+        await db.commit()
         return AnswerOut(answer=answer, citations=citations)
     except (AIServiceError, VectorStoreError) as error:
         await finalize_run(db, run, "failed", error_code=str(error)[:500])

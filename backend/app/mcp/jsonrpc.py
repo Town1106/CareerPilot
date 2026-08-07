@@ -26,7 +26,9 @@ class StdioMCPClient:
         self._command = command
         self._env = env
         self._process: asyncio.subprocess.Process | None = None
+        self._stderr_task: asyncio.Task | None = None
         self._request_id = 0
+        self._request_lock = asyncio.Lock()
         self._connected = False
         self._server_info: dict[str, Any] = {}
         self._tools: list[dict[str, Any]] = []
@@ -54,6 +56,7 @@ class StdioMCPClient:
                 stderr=asyncio.subprocess.PIPE,
                 env={**os.environ, **(self._env or {})},
             )
+        self._stderr_task = asyncio.create_task(self._drain_stderr())
         try:
             result = await self._request("initialize", {
                 "protocolVersion": "2024-11-05",
@@ -64,12 +67,11 @@ class StdioMCPClient:
             await self._send("notifications/initialized", {})
             self._connected = True
             logger.info("MCP connected: %s", self._server_info.get("serverInfo", {}).get("name", "unknown"))
+            tools_result = await self._request("tools/list", {})
+            self._tools = tools_result.get("tools", [])
         except Exception:
             await self._cleanup()
             raise
-
-        tools_result = await self._request("tools/list", {})
-        self._tools = tools_result.get("tools", [])
         logger.info("MCP discovered %d tools", len(self._tools))
 
     async def disconnect(self) -> None:
@@ -88,6 +90,15 @@ class StdioMCPClient:
                 logger.debug("process kill failed", exc_info=True)
             await self._process.wait()
             self._process = None
+        if self._stderr_task:
+            await self._stderr_task
+            self._stderr_task = None
+
+    async def _drain_stderr(self) -> None:
+        if not self._process or self._process.stderr is None:
+            return
+        while line := await self._process.stderr.readline():
+            logger.debug("MCP stderr: %s", line.decode("utf-8", errors="replace").rstrip())
 
     @property
     def tools(self) -> list[dict[str, Any]]:
@@ -106,6 +117,10 @@ class StdioMCPClient:
         return content
 
     async def _request(self, method: str, params: dict[str, Any]) -> Any:
+        async with self._request_lock:
+            return await self._request_unlocked(method, params)
+
+    async def _request_unlocked(self, method: str, params: dict[str, Any]) -> Any:
         if not self._process or self._process.stdin is None or self._process.stdout is None:
             raise MCPProtocolError("MCP client not connected")
         self._request_id += 1
@@ -119,13 +134,16 @@ class StdioMCPClient:
         self._process.stdin.write(payload.encode("utf-8"))
         await self._process.stdin.drain()
 
-        line = await asyncio.wait_for(self._process.stdout.readline(), timeout=30.0)
-        if not line:
-            raise MCPProtocolError("MCP server closed connection")
-        try:
-            response = json.loads(line.decode("utf-8"))
-        except json.JSONDecodeError as e:
-            raise MCPProtocolError(f"Invalid JSON-RPC response: {e}") from e
+        while True:
+            line = await asyncio.wait_for(self._process.stdout.readline(), timeout=30.0)
+            if not line:
+                raise MCPProtocolError("MCP server closed connection")
+            try:
+                response = json.loads(line.decode("utf-8"))
+            except json.JSONDecodeError as e:
+                raise MCPProtocolError(f"Invalid JSON-RPC response: {e}") from e
+            if "id" in response:
+                break
 
         if "error" in response:
             err = response["error"]

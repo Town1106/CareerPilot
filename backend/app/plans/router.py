@@ -37,14 +37,6 @@ async def create_plan(
     db: AsyncSession = Depends(get_db),
 ) -> PlanOut:
     workspace = await owned_workspace(workspace_id, user, db)
-    existing = await db.scalar(
-        select(StudyPlan).where(
-            StudyPlan.workspace_id == workspace_id,
-            StudyPlan.status == "active",
-        )
-    )
-    if existing:
-        raise HTTPException(status.HTTP_409_CONFLICT, "当前已有进行中的学习计划，请先归档再创建")
     try:
         return await generate_plan(
             db, workspace, payload.start_date, payload.end_date, payload.daily_minutes

@@ -68,6 +68,7 @@ async def generate_question(
 ) -> str:
     run = await create_run(db, workspace_id, "interview_generate_question", DASHSCOPE_CHAT_MODEL)
     try:
+        generation_started = utc_now()
         usage = {}
         payload = await gateway.structured_chat(
             (
@@ -92,6 +93,7 @@ async def generate_question(
             db, run, "generate", status="completed",
             input_summary=f"为 {competency.canonical_name} 生成题目",
             output_summary=str(payload.get("question", ""))[:500],
+            started_at=generation_started,
         )
         await finalize_run(
             db, run, "completed",
@@ -193,6 +195,7 @@ async def assess_answer(
 ) -> AnswerAssessment:
     run = await create_run(db, workspace_id, "interview_assess", DASHSCOPE_CHAT_MODEL)
     try:
+        assessment_started = utc_now()
         usage = {}
         payload = await gateway.structured_chat(
             (
@@ -214,6 +217,7 @@ async def assess_answer(
             db, run, "assess", status="completed",
             input_summary=f"评估 {turn.competency_name} 回答",
             output_summary=payload.get("observation", "")[:500],
+            started_at=assessment_started,
         )
         await finalize_run(
             db, run, "completed",
@@ -235,6 +239,7 @@ async def build_report(
     answered = [turn for turn in turns if turn.answer]
     run = await create_run(db, workspace_id, "interview_report", DASHSCOPE_CHAT_MODEL)
     try:
+        report_started = utc_now()
         usage = {}
         payload = await gateway.structured_chat(
             (
@@ -266,6 +271,7 @@ async def build_report(
             db, run, "generate_report", status="completed",
             input_summary=f"为 {len(answered)} 题生成评分报告",
             output_summary=payload.get("summary", "")[:500],
+            started_at=report_started,
         )
         await finalize_run(
             db, run, "completed",

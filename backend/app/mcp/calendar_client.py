@@ -41,14 +41,20 @@ class CalendarMCPClient(MCPClient):
         self._mcp: StdioMCPClient | None = None
         self._use_mcp = bool(CALENDAR_MCP_COMMAND)
         self._mock_events: dict[str, list[dict[str, Any]]] = {}
+        self._owner_user_id: str | None = None
 
-    async def connect(self) -> None:
+    async def connect(self, user_id: str | None = None) -> None:
+        if self._connected:
+            if self._mcp:
+                self._require_mcp_owner(user_id or "")
+            return
         if self._use_mcp:
             try:
                 cmd = CALENDAR_MCP_COMMAND.split()
                 self._mcp = StdioMCPClient(cmd)
                 await self._mcp.connect()
                 self._connected = True
+                self._owner_user_id = user_id
                 logger.info("Calendar MCP protocol connected, %d tools available", len(self._mcp.tools))
                 return
             except (MCPProtocolError, FileNotFoundError, OSError, NotImplementedError) as e:
@@ -65,6 +71,14 @@ class CalendarMCPClient(MCPClient):
             await self._mcp.disconnect()
             self._mcp = None
         self._connected = False
+        self._owner_user_id = None
+
+    def _require_mcp_owner(self, user_id: str) -> None:
+        if self._mcp and self._owner_user_id != user_id:
+            raise PermissionError("Calendar 连接属于其他用户")
+
+    def require_owner(self, user_id: str) -> None:
+        self._require_mcp_owner(user_id)
 
     async def create_event(
         self,
@@ -75,6 +89,7 @@ class CalendarMCPClient(MCPClient):
         duration_minutes: int,
         source_task_id: str | None = None,
     ) -> dict[str, Any]:
+        self._require_mcp_owner(user_id)
         if self._mcp:
             result = await self._mcp.call_tool("create_event", {
                 "title": title,
@@ -101,6 +116,7 @@ class CalendarMCPClient(MCPClient):
         return event
 
     async def list_events(self, user_id: str) -> list[dict[str, Any]]:
+        self._require_mcp_owner(user_id)
         if self._mcp:
             result = await self._mcp.call_tool("list_events", {})
             return result if isinstance(result, list) else []
@@ -108,6 +124,7 @@ class CalendarMCPClient(MCPClient):
         return self._mock_events.get(user_id, [])
 
     async def delete_event(self, user_id: str, event_id: str) -> bool:
+        self._require_mcp_owner(user_id)
         if self._mcp:
             await self._mcp.call_tool("delete_event", {"event_id": event_id})
             return True

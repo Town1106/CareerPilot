@@ -1,14 +1,14 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FactOut(BaseModel):
     id: uuid.UUID
     workspace_id: uuid.UUID
     repo_full_name: str
-    extracted_tech_stack: dict | None
+    extracted_tech_stack: list[str] | None
     extracted_summary: str | None
     extracted_role: str | None
     commit_count: int
@@ -25,10 +25,10 @@ class ReportOut(BaseModel):
     id: uuid.UUID
     workspace_id: uuid.UUID
     repo_full_name: str
-    matched_items: dict | None
-    missing_in_resume: dict | None
-    conflicts: dict | None
-    overall_score: float
+    matched_items: list[dict] | None
+    missing_in_resume: list[dict] | None
+    conflicts: list[dict] | None
+    overall_score: float = Field(ge=0, le=100)
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -39,8 +39,8 @@ class ReportListOut(BaseModel):
 
 
 class ExtractRequest(BaseModel):
-    repo_full_name: str
+    repo_full_name: str = Field(pattern=r"^[^/\s]+/[^/\s]+$")
 
 
 class CheckRequest(BaseModel):
-    repo_full_name: str
+    repo_full_name: str = Field(pattern=r"^[^/\s]+/[^/\s]+$")

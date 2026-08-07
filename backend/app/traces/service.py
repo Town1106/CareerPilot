@@ -39,6 +39,11 @@ async def add_step(
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
 ) -> AgentRunStep:
+    started = started_at or utc_now()
+    completed = completed_at or (utc_now() if status in {"completed", "failed"} else None)
+    measured_latency = latency_ms
+    if measured_latency is None and completed is not None:
+        measured_latency = max(0, round((completed - started).total_seconds() * 1000))
     step = AgentRunStep(
         run_id=run.id,
         step_name=step_name,
@@ -46,10 +51,10 @@ async def add_step(
         input_summary=input_summary[:500] if input_summary else None,
         output_summary=output_summary[:500] if output_summary else None,
         retrieved_chunks=json.dumps(retrieved_chunks, ensure_ascii=False) if retrieved_chunks else None,
-        latency_ms=latency_ms or 0,
+        latency_ms=measured_latency or 0,
         error_code=error_code[:500] if error_code else None,
-        started_at=started_at or utc_now(),
-        completed_at=completed_at,
+        started_at=started,
+        completed_at=completed,
     )
     db.add(step)
     await db.flush()
@@ -62,16 +67,21 @@ async def finalize_run(
     status: str,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
-    latency_ms: int = 0,
+    latency_ms: int | None = None,
     error_code: str | None = None,
 ) -> None:
     run.status = status
     run.prompt_tokens = prompt_tokens
     run.completion_tokens = completion_tokens
     run.total_tokens = prompt_tokens + completion_tokens
-    run.latency_ms = latency_ms
+    completed_at = utc_now()
+    run.latency_ms = (
+        latency_ms
+        if latency_ms is not None
+        else max(0, round((completed_at - run.started_at).total_seconds() * 1000))
+    )
     run.error_code = error_code[:500] if error_code else None
-    run.completed_at = utc_now()
+    run.completed_at = completed_at
     await db.flush()
 
 

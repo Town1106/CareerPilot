@@ -1,6 +1,7 @@
 import datetime
+import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MCPStatus(BaseModel):
@@ -48,11 +49,12 @@ class CommitList(BaseModel):
 
 
 class ImportRequest(BaseModel):
-    workspace_id: str
-    repo_full_name: str
+    workspace_id: uuid.UUID
+    repo_full_name: str = Field(pattern=r"^[^/\s]+/[^/\s]+$")
 
 
 class CalendarEventCreate(BaseModel):
+    workspace_id: uuid.UUID
     title: str
     description: str
     date: datetime.date

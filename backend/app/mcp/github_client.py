@@ -43,6 +43,8 @@ class GitHubHTTPClient:
         else:
             self._connected = False
             logger.warning("GitHub HTTP auth failed: %s", resp.status_code)
+            await self._client.aclose()
+            self._client = None
 
     async def disconnect(self) -> None:
         if self._client:
@@ -101,14 +103,19 @@ class GitHubMCPClient(MCPClient):
         self._mcp: StdioMCPClient | None = None
         self._http: GitHubHTTPClient | None = None
         self._use_mcp = bool(GITHUB_MCP_COMMAND)
+        self._owner_user_id: str | None = None
 
-    async def connect(self) -> None:
+    async def connect(self, user_id: str | None = None) -> None:
+        if self._connected:
+            self.require_owner(user_id)
+            return
         if self._use_mcp:
             try:
                 cmd = GITHUB_MCP_COMMAND.split()
                 self._mcp = StdioMCPClient(cmd, env={"GITHUB_PERSONAL_ACCESS_TOKEN": GITHUB_TOKEN})
                 await self._mcp.connect()
                 self._connected = True
+                self._owner_user_id = user_id
                 logger.info("GitHub MCP protocol connected, %d tools available", len(self._mcp.tools))
                 return
             except (MCPProtocolError, FileNotFoundError, OSError, NotImplementedError) as e:
@@ -119,6 +126,7 @@ class GitHubMCPClient(MCPClient):
         self._http = GitHubHTTPClient()
         await self._http.connect()
         self._connected = self._http.connected
+        self._owner_user_id = user_id if self._connected else None
 
     async def disconnect(self) -> None:
         if self._mcp:
@@ -128,6 +136,11 @@ class GitHubMCPClient(MCPClient):
             await self._http.disconnect()
             self._http = None
         self._connected = False
+        self._owner_user_id = None
+
+    def require_owner(self, user_id: str | None) -> None:
+        if self._connected and self._owner_user_id != user_id:
+            raise PermissionError("GitHub 连接属于其他用户")
 
     async def list_repos(self, page: int = 1, per_page: int = 30) -> tuple[list[dict[str, Any]], bool]:
         if self._mcp:

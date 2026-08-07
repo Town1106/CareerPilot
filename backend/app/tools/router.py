@@ -62,14 +62,16 @@ async def list_pending_approvals(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ApprovalListOut:
-    ws = await db.scalar(select(Workspace).where(Workspace.user_id == user.id).limit(1))
-    if not ws:
+    workspace_ids = list(
+        (await db.scalars(select(Workspace.id).where(Workspace.user_id == user.id))).all()
+    )
+    if not workspace_ids:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workspace not found")
     rows = list(
         (
             await db.scalars(
                 select(ToolApproval)
-                .where(ToolApproval.workspace_id == ws.id)
+                .where(ToolApproval.workspace_id.in_(workspace_ids))
                 .where(ToolApproval.status == "pending")
                 .order_by(ToolApproval.created_at.desc())
             )
@@ -85,12 +87,17 @@ async def decide_approval(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ApprovalOut:
-    row = await db.scalar(select(ToolApproval).where(ToolApproval.id == approval_id))
+    row = await db.scalar(
+        select(ToolApproval)
+        .join(Workspace, Workspace.id == ToolApproval.workspace_id)
+        .where(ToolApproval.id == approval_id, Workspace.user_id == user.id)
+    )
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Approval not found")
     if row.status != "pending":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Approval already decided")
     row.status = "approved" if body.approve else "denied"
     row.decided_at = utc_now()
-    await db.flush()
+    await db.commit()
+    await db.refresh(row)
     return ApprovalOut.model_validate(row)

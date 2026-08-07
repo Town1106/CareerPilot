@@ -113,7 +113,9 @@ export function PlansView({ workspace, onBack, onTraces, onSkills }: { workspace
       await api("/api/v1/mcp/calendar/connect", { method: "POST" });
       await api("/api/v1/mcp/calendar/events", {
         method: "POST",
+        headers: { "X-User-Confirmed": "true" },
         body: JSON.stringify({
+          workspace_id: workspace.id,
           title: task.title,
           description: task.description,
           date: task.scheduled_date,

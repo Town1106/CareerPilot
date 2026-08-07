@@ -5,6 +5,8 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.harness.graph import build_graph
 from app.harness.state import AgentState
 
@@ -16,6 +18,7 @@ async def stream_agent(
     workspace_id: str,
     user_id: str,
     input_data: dict,
+    db: AsyncSession,
 ) -> AsyncIterator[str]:
     """执行 LangGraph 多节点图并将每个节点的事件作为 SSE 流式推送。
 
@@ -33,9 +36,11 @@ async def stream_agent(
             "workspace_id": workspace_id,
             "user_id": user_id,
             "input": input_data,
+            "db": db,
             "run_id": run_id,
         }
 
+        final_output = None
         async for chunk in graph.astream(initial_state, {"recursion_limit": 25}):
             for node_name, node_output in chunk.items():
                 if isinstance(node_output, dict):
@@ -44,11 +49,16 @@ async def stream_agent(
                     for evt in events:
                         yield _sse(evt)
 
+                    if "output" in node_output:
+                        final_output = node_output["output"]
+
                     # 推送节点产出的错误
                     error = node_output.get("error")
                     if error:
                         yield _sse({"event": "error", "node": node_name, "message": str(error)})
                         return
+
+        yield _sse({"event": "done", "run_id": run_id, "output": final_output})
 
     except Exception as exc:
         logger.exception("Agent stream failed for skill %s", skill_name)

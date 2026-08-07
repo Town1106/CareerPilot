@@ -5,10 +5,13 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import current_user
 from app.auth.models import User
+from app.core.database import get_db
 from app.harness.stream import stream_agent
+from app.workspaces.dependencies import owned_workspace
 
 router = APIRouter(tags=["harness"])
 
@@ -23,6 +26,7 @@ async def agent_stream(
     workspace_id: uuid.UUID,
     payload: AgentStreamRequest,
     user: User = Depends(current_user),  # noqa: B008 — FastAPI Depends pattern
+    db: AsyncSession = Depends(get_db),  # noqa: B008 — FastAPI Depends pattern
 ) -> StreamingResponse:
     """LangGraph Agent SSE 流式端点。
 
@@ -30,6 +34,7 @@ async def agent_stream(
     """
     if payload.skill_name not in ("rag_qa", "jd_analysis", "study_plan"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"不支持的 Skill: {payload.skill_name}")
+    await owned_workspace(workspace_id, user, db)
 
     return StreamingResponse(
         stream_agent(
@@ -37,6 +42,7 @@ async def agent_stream(
             workspace_id=str(workspace_id),
             user_id=str(user.id),
             input_data=payload.input,
+            db=db,
         ),
         media_type="text/event-stream",
         headers={

@@ -1,0 +1,9 @@
+name: calendar-event-delete
+version: 1.0.0
+description: 从外部日历中删除事件
+risk_level: R3
+input_schema:
+  workspace_id: uuid
+  event_id: string
+output_schema:
+  deleted: boolean
